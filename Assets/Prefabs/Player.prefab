@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: -262057320545102742}
   - component: {fileID: -6968156275157675207}
   - component: {fileID: -6026541863412064557}
+  - component: {fileID: -4687261658800787761}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -140,7 +141,7 @@ MonoBehaviour:
   _teleportThreshold: 1
   <PrefabId>k__BackingField: 1
   <SpawnableCollectionId>k__BackingField: 0
-  <AssetPathHash>k__BackingField: 3127767274982672596
+  <AssetPathHash>k__BackingField: 2092870565765373345
   SceneId: 0
   SerializedTransformProperties:
     Position: {x: 0, y: 0, z: 0}
@@ -251,3 +252,26 @@ MonoBehaviour:
     X: 0
     Y: 0
     Z: 0
+--- !u!114 &-4687261658800787761
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3105670873629239247}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea44ef649d1927341929f1f6e13327a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 4326351770396735908}
+  _networkObjectCache: {fileID: 0}
+  plantKey: 101
+  placementType: 0
+  reachDistance: 1
+  gridSize: 1
+  plantPrefab: {fileID: 663978825772099299, guid: 2b265d5907a0aae409077052d888c80b, type: 3}
+  blockedLayers:
+    serializedVersion: 2
+    m_Bits: 0
