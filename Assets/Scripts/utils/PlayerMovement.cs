@@ -1,8 +1,9 @@
 using UnityEngine;
+using FishNet.Object;
 
 // Memastikan komponen Rigidbody2D otomatis ditambahkan ke GameObject
 [RequireComponent(typeof(Rigidbody2D))]
-public class PlayerMovement : MonoBehaviour
+public class PlayerMovement : NetworkBehaviour
 {
     [Header("Pengaturan Pergerakan")]
     [Tooltip("Kecepatan berjalan karakter.")]
@@ -11,7 +12,7 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody2D rb;
     private Vector2 movement;
 
-    private void Start()
+    private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         
@@ -22,6 +23,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        if (!IsOwner) return; // Hanya pemilik objek yang dapat mengontrol pergerakan
+
         // 1. Mengambil Input (Selalu lakukan di Update agar responsif)
         // GetAxisRaw membuat kontrol lebih "snappy" (langsung jalan/berhenti tanpa efek licin)
         movement.x = Input.GetAxisRaw("Horizontal");
@@ -33,6 +36,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (!IsOwner) return;
+
         // 2. Mengaplikasikan Pergerakan Fisika (Selalu lakukan di FixedUpdate)
         rb.velocity = movement * moveSpeed;
     }
