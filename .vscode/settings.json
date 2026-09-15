@@ -49,6 +49,8 @@
         "library/": true,
         "obj/": true,
         "Obj/": true,
+        "**/[Bb]in/**": true,
+        "**/[Oo]bj/**": true,
         "Logs/": true,
         "logs/": true,
         "ProjectSettings/": true,
