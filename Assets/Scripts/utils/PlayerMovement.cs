@@ -12,6 +12,22 @@ public class PlayerMovement : NetworkBehaviour
     private Rigidbody2D rb;
     private Vector2 movement;
 
+
+    public override void OnStartNetwork()
+    {
+        base.OnStartNetwork();
+
+        // Memberi warna berbeda pada karakter milik sendiri agar mudah dikenali saat testing
+        if (base.Owner.IsLocalClient)
+        {
+            GetComponent<Renderer>().material.color = Color.green; // Player Lokal = Hijau
+        }
+        else
+        {
+            GetComponent<Renderer>().material.color = Color.red;   // Player Lain = Merah
+        }
+    }
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
