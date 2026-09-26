@@ -12,6 +12,13 @@ public class PlayerMovement : NetworkBehaviour
     private Rigidbody2D rb;
     private Vector2 movement;
 
+    /// <summary>
+    /// Arah hadap terakhir pemain (terkoreksi saat bergerak).
+    /// Digunakan oleh sistem aksi (seperti PlayerPlanter) untuk menentukan titik di depan pemain.
+    /// Default menghadap ke bawah (Vector2.down).
+    /// </summary>
+    public Vector2 FacingDirection { get; private set; } = Vector2.down;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -32,6 +39,12 @@ public class PlayerMovement : NetworkBehaviour
 
         // Normalisasi vektor agar jalan menyamping (diagonal) tidak lebih cepat dari lurus
         movement = movement.normalized;
+
+        // Memperbarui arah hadap saat ada pergerakan
+        if (movement != Vector2.zero)
+        {
+            FacingDirection = movement;
+        }
     }
 
     private void FixedUpdate()
