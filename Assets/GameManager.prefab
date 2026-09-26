@@ -105,6 +105,8 @@ MonoBehaviour:
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 6951573975057506569}
   _networkObjectCache: {fileID: 0}
+  tilemapTanah: {fileID: 0}
+  tilemapBasah: {fileID: 0}
   tilemapLahan: {fileID: 0}
   tileKering: {fileID: 11400000, guid: 8edc6641d36534833add5050c415ae8b, type: 2}
   tileBasah: {fileID: 11400000, guid: e75937020a6454f108398be0a32e3f59, type: 2}
