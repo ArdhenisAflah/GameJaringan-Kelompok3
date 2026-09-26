@@ -508,6 +508,30 @@ public static class LobbyUIAutoBuilder
             }
         }
 
+        // 6. Ensure Global Light 2D illuminates all sorting layers (Tanah, TanahBasah, Tanaman, Karakter, etc.)
+        GameObject globalLightGo = GameObject.Find("Global Light 2D");
+        if (globalLightGo != null)
+        {
+            var light2D = globalLightGo.GetComponent<UnityEngine.Rendering.Universal.Light2D>();
+            if (light2D != null)
+            {
+                SerializedObject so = new SerializedObject(light2D);
+                SerializedProperty prop = so.FindProperty("m_ApplyToSortingLayers");
+                if (prop != null)
+                {
+                    prop.ClearArray();
+                    var allLayers = SortingLayer.layers;
+                    for (int i = 0; i < allLayers.Length; i++)
+                    {
+                        prop.InsertArrayElementAtIndex(i);
+                        prop.GetArrayElementAtIndex(i).intValue = allLayers[i].id;
+                    }
+                    so.ApplyModifiedProperties();
+                    EditorUtility.SetDirty(light2D);
+                }
+            }
+        }
+
         // Save SampleScene
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
