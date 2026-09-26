@@ -11,9 +11,9 @@ TagManager:
   - 
   - Water
   - UI
-  - 
-  - 
-  - 
+  - Tanah
+  - Tanaman
+  - Pemain
   - 
   - 
   - 
@@ -40,4 +40,16 @@ TagManager:
   m_SortingLayers:
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: Tanah
+    uniqueID: 1845182931
+    locked: 0
+  - name: TanahBasah
+    uniqueID: 1845182932
+    locked: 0
+  - name: Tanaman
+    uniqueID: 2519284102
+    locked: 0
+  - name: Karakter
+    uniqueID: 3195821034
     locked: 0

@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 7201433464415856501}
   - component: {fileID: 6255449745752365367}
   - component: {fileID: -647378733050302277}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: PlantPrefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -73,9 +73,9 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
+  m_SortingLayerID: 2519284102
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 5
   m_Sprite: {fileID: -1829352138, guid: 0c2acf6f62953be4484332886917df07, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0

@@ -16,11 +16,19 @@ public class LahanManagerTilemap : NetworkBehaviour
     public static LahanManagerTilemap Instance { get; private set; }
 
     [Header("Pengaturan Tilemap")]
+    [Tooltip("Layer Tilemap khusus untuk tanah kering (Order in Layer 0 / Sorting Layer Tanah)")]
+    public Tilemap tilemapTanah;
+    [Tooltip("Layer Tilemap khusus untuk tanah basah disiram (Order in Layer 1 / Sorting Layer TanahBasah)")]
+    public Tilemap tilemapBasah;
+    [Tooltip("Fallback single tilemap untuk backward-compatibility")]
     public Tilemap tilemapLahan;
+
     public TileBase tileKering; 
     public TileBase tileBasah;  
 
     private readonly Dictionary<Vector3Int, InfoPetak> dataGrid = new Dictionary<Vector3Int, InfoPetak>();
+
+    public Tilemap PrimaryTilemap => tilemapTanah != null ? tilemapTanah : (tilemapLahan != null ? tilemapLahan : tilemapBasah);
 
     private void Awake()
     {
@@ -32,11 +40,21 @@ public class LahanManagerTilemap : NetworkBehaviour
         Instance = this;
 
         // Auto-discovery Tilemap jika belum terpasang di Inspector
+        if (tilemapTanah == null)
+        {
+            GameObject go = GameObject.Find("TilemapTanah");
+            if (go != null) tilemapTanah = go.GetComponent<Tilemap>();
+        }
+        if (tilemapBasah == null)
+        {
+            GameObject go = GameObject.Find("TilemapBasah");
+            if (go != null) tilemapBasah = go.GetComponent<Tilemap>();
+        }
         if (tilemapLahan == null)
         {
             GameObject go = GameObject.Find("TilemapLahan");
             if (go != null) tilemapLahan = go.GetComponent<Tilemap>();
-            if (tilemapLahan == null) tilemapLahan = FindObjectOfType<Tilemap>();
+            if (tilemapLahan == null && tilemapTanah == null) tilemapLahan = FindObjectOfType<Tilemap>();
         }
 
 #if UNITY_EDITOR
@@ -65,21 +83,20 @@ public class LahanManagerTilemap : NetworkBehaviour
     [TargetRpc]
     private void Target_SyncTile(NetworkConnection connection, Vector3Int gridPos, bool statusDisiram)
     {
-        if (tilemapLahan != null)
-        {
-            tilemapLahan.SetTile(gridPos, statusDisiram ? tileBasah : tileKering);
-        }
+        ApplyTileVisual(gridPos, statusDisiram);
     }
 
     public Vector3Int WorldToCell(Vector3 worldPos)
     {
-        if (tilemapLahan != null) return tilemapLahan.WorldToCell(worldPos);
+        Tilemap tm = PrimaryTilemap;
+        if (tm != null) return tm.WorldToCell(worldPos);
         return new Vector3Int(Mathf.FloorToInt(worldPos.x), Mathf.FloorToInt(worldPos.y), 0);
     }
 
     public Vector3 GetCellCenterWorld(Vector3Int cellPos)
     {
-        if (tilemapLahan != null) return tilemapLahan.GetCellCenterWorld(cellPos);
+        Tilemap tm = PrimaryTilemap;
+        if (tm != null) return tm.GetCellCenterWorld(cellPos);
         return new Vector3(cellPos.x + 0.5f, cellPos.y + 0.5f, 0f);
     }
 
@@ -188,7 +205,21 @@ public class LahanManagerTilemap : NetworkBehaviour
     [ObserversRpc]
     private void Observers_UpdateTile(Vector3Int gridPos, bool statusDisiram)
     {
-        if (tilemapLahan == null) return;
-        tilemapLahan.SetTile(gridPos, statusDisiram ? tileBasah : tileKering);
+        ApplyTileVisual(gridPos, statusDisiram);
+    }
+
+    private void ApplyTileVisual(Vector3Int gridPos, bool statusDisiram)
+    {
+        if (tilemapTanah != null && tilemapBasah != null)
+        {
+            // Layer 1 (Order 0): Tanah Kering selalu ada sebagai dasar petak garapan
+            tilemapTanah.SetTile(gridPos, tileKering);
+            // Layer 2 (Order 1): Tanah Basah berada di atas tanah kering jika sudah disiram
+            tilemapBasah.SetTile(gridPos, statusDisiram ? tileBasah : null);
+        }
+        else if (tilemapLahan != null)
+        {
+            tilemapLahan.SetTile(gridPos, statusDisiram ? tileBasah : tileKering);
+        }
     }
 }

@@ -445,7 +445,7 @@ public static class LobbyUIAutoBuilder
         NetworkObject playerNob = AssetDatabase.LoadAssetAtPath<NetworkObject>("Assets/Player.prefab");
         spawner.SetEditorReferences(playerNob, new Transform[] { sp1.transform, sp2.transform });
 
-        // 5. Ensure Grid & TilemapLahan exist
+        // 5. Ensure Grid, TilemapTanah (Order 0), and TilemapBasah (Order 1) exist
         GameObject gridObj = GameObject.Find("Grid");
         if (gridObj == null)
         {
@@ -453,15 +453,34 @@ public static class LobbyUIAutoBuilder
             gridObj.AddComponent<Grid>();
         }
 
-        GameObject tilemapObj = GameObject.Find("TilemapLahan");
-        if (tilemapObj == null)
+        Material defaultSpriteMat = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Sprite.mat");
+
+        GameObject tilemapTanahObj = GameObject.Find("TilemapTanah");
+        if (tilemapTanahObj == null)
         {
-            tilemapObj = new GameObject("TilemapLahan");
-            tilemapObj.transform.SetParent(gridObj.transform, false);
-            Tilemap tm = tilemapObj.AddComponent<Tilemap>();
-            TilemapRenderer tmr = tilemapObj.AddComponent<TilemapRenderer>();
-            Material defaultSpriteMat = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Sprite.mat");
+            tilemapTanahObj = new GameObject("TilemapTanah");
+            tilemapTanahObj.transform.SetParent(gridObj.transform, false);
+            tilemapTanahObj.AddComponent<Tilemap>();
+            TilemapRenderer tmr = tilemapTanahObj.AddComponent<TilemapRenderer>();
             if (defaultSpriteMat != null) tmr.material = defaultSpriteMat;
+            tmr.sortingLayerName = "Tanah";
+            tmr.sortingOrder = 0;
+            int tanahLayer = LayerMask.NameToLayer("Tanah");
+            if (tanahLayer >= 0) tilemapTanahObj.layer = tanahLayer;
+        }
+
+        GameObject tilemapBasahObj = GameObject.Find("TilemapBasah");
+        if (tilemapBasahObj == null)
+        {
+            tilemapBasahObj = new GameObject("TilemapBasah");
+            tilemapBasahObj.transform.SetParent(gridObj.transform, false);
+            tilemapBasahObj.AddComponent<Tilemap>();
+            TilemapRenderer tmr = tilemapBasahObj.AddComponent<TilemapRenderer>();
+            if (defaultSpriteMat != null) tmr.material = defaultSpriteMat;
+            tmr.sortingLayerName = "TanahBasah";
+            tmr.sortingOrder = 1;
+            int tanahLayer = LayerMask.NameToLayer("Tanah");
+            if (tanahLayer >= 0) tilemapBasahObj.layer = tanahLayer;
         }
 
         // 6. Ensure GameManager prefab instance exists in scene
@@ -481,7 +500,8 @@ public static class LobbyUIAutoBuilder
             LahanManagerTilemap lmt = gameManagerObj.GetComponent<LahanManagerTilemap>();
             if (lmt != null)
             {
-                if (tilemapObj != null) lmt.tilemapLahan = tilemapObj.GetComponent<Tilemap>();
+                if (tilemapTanahObj != null) lmt.tilemapTanah = tilemapTanahObj.GetComponent<Tilemap>();
+                if (tilemapBasahObj != null) lmt.tilemapBasah = tilemapBasahObj.GetComponent<Tilemap>();
                 if (lmt.tileKering == null) lmt.tileKering = AssetDatabase.LoadAssetAtPath<TileBase>("Assets/TileKering.asset");
                 if (lmt.tileBasah == null) lmt.tileBasah = AssetDatabase.LoadAssetAtPath<TileBase>("Assets/TileBasah.asset");
                 EditorUtility.SetDirty(lmt);
