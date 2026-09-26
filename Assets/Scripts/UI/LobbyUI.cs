@@ -30,6 +30,20 @@ public class LobbyUI : MonoBehaviour
     [SerializeField] private Button startGameButton;
     [SerializeField] private Button leaveRoomButton;
 
+    private void OnEnable()
+    {
+        lobby.OnAuthenticated += OnUserAuthenticated;
+        lobby.OnLobbyLeft += OnLobbyLeftHandler;
+        lobby.OnHostDisconnected += OnHostDisconnectedHandler;
+    }
+
+    private void OnDisable()
+    {
+        lobby.OnAuthenticated -= OnUserAuthenticated;
+        lobby.OnLobbyLeft -= OnLobbyLeftHandler;
+        lobby.OnHostDisconnected -= OnHostDisconnectedHandler;
+    }
+
     private void Start()
     {
         // Hook up button listeners
@@ -48,9 +62,6 @@ public class LobbyUI : MonoBehaviour
         if (leaveRoomButton != null)
             leaveRoomButton.onClick.AddListener(OnLeaveRoomClicked);
 
-        // Listen for authentication completion
-        lobby.OnAuthenticated += OnUserAuthenticated;
-
         if (lobby.Instance != null && lobby.Instance.IsAuthenticated)
         {
             ShowBrowserPanel();
@@ -65,11 +76,35 @@ public class LobbyUI : MonoBehaviour
 
     private void OnDestroy()
     {
-        lobby.OnAuthenticated -= OnUserAuthenticated;
+        if (createRoomButton != null)
+            createRoomButton.onClick.RemoveListener(OnCreateRoomClicked);
+
+        if (joinByCodeButton != null)
+            joinByCodeButton.onClick.RemoveListener(OnJoinByCodeClicked);
+
+        if (refreshListButton != null)
+            refreshListButton.onClick.RemoveListener(RefreshLobbyList);
+
+        if (startGameButton != null)
+            startGameButton.onClick.RemoveListener(OnStartGameClicked);
+
+        if (leaveRoomButton != null)
+            leaveRoomButton.onClick.RemoveListener(OnLeaveRoomClicked);
     }
 
     private void OnUserAuthenticated()
     {
+        ShowBrowserPanel();
+    }
+
+    private void OnLobbyLeftHandler()
+    {
+        ShowBrowserPanel();
+    }
+
+    private void OnHostDisconnectedHandler(string reason)
+    {
+        Debug.LogWarning($"[LobbyUI] Ejected from room: {reason}");
         ShowBrowserPanel();
     }
 
@@ -173,9 +208,12 @@ public class LobbyUI : MonoBehaviour
         lobby.Instance.StartGame();
     }
 
-    private void OnLeaveRoomClicked()
+    private async void OnLeaveRoomClicked()
     {
-        lobby.Instance.LeaveLobby();
+        if (lobby.Instance != null)
+        {
+            await lobby.Instance.LeaveLobby();
+        }
         ShowBrowserPanel();
     }
 

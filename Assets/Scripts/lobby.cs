@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Unity.Services.Core;
 using Unity.Services.Authentication;
 using Unity.Services.Relay;
@@ -11,6 +13,7 @@ using Unity.Services.Lobbies;
 using Unity.Services.Lobbies.Models;
 using FishNet;
 using FishNet.Managing.Scened;
+using FishNet.Transporting;
 using FishNet.Transporting.UTP;
 
 public class lobby : MonoBehaviour
@@ -18,6 +21,9 @@ public class lobby : MonoBehaviour
     public static lobby Instance { get; private set; }
 
     public static event Action OnAuthenticated;
+    public static event Action OnLobbyLeft;
+    public static event Action<string> OnHostDisconnected;
+
     public bool IsAuthenticated => UnityServices.State == ServicesInitializationState.Initialized 
                                    && AuthenticationService.Instance != null 
                                    && AuthenticationService.Instance.IsSignedIn;
@@ -31,7 +37,12 @@ public class lobby : MonoBehaviour
 
     // Timers for UGS Lobby requirements
     private float heartbeatTimer = 15f;
-    private float lobbyPollTimer = 1.5f;
+    private float lobbyPollTimer = 2.5f;
+    private bool isHeartbeatRunning = false;
+    private bool isPollRunning = false;
+    private bool isSubscribedToClientEvents = false;
+
+    private CancellationTokenSource cancellationTokenSource;
 
     private const string KEY_RELAY_JOIN_CODE = "RelayJoinCode";
 
@@ -43,10 +54,28 @@ public class lobby : MonoBehaviour
             return;
         }
         Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    private void OnEnable()
+    {
+        SubscribeToNetworkEvents();
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribeFromNetworkEvents();
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeFromNetworkEvents();
+        CancelActiveTasks();
     }
 
     private async void Start()
     {
+        SubscribeToNetworkEvents();
         await Authenticate();
     }
 
@@ -56,8 +85,110 @@ public class lobby : MonoBehaviour
         HandleLobbyPollForUpdates();
     }
 
+    private void OnApplicationQuit()
+    {
+        CancelActiveTasks();
+
+        if (joinedLobby != null)
+        {
+            try
+            {
+                string lobbyId = joinedLobby.Id;
+                string playerId = AuthenticationService.Instance?.PlayerId;
+                bool isHost = (hostLobby != null || (playerId != null && joinedLobby.HostId == playerId));
+
+                if (isHost)
+                {
+                    LobbyService.Instance.DeleteLobbyAsync(lobbyId);
+                }
+                else if (!string.IsNullOrEmpty(playerId))
+                {
+                    LobbyService.Instance.RemovePlayerAsync(lobbyId, playerId);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Lobby] Teardown on quit warning: {e.Message}");
+            }
+        }
+
+        if (InstanceFinder.NetworkManager != null)
+        {
+            if (InstanceFinder.IsServerStarted) InstanceFinder.ServerManager.StopConnection(true);
+            else if (InstanceFinder.IsClientStarted) InstanceFinder.ClientManager.StopConnection();
+        }
+    }
+
     // ==========================================
-    // 1. AUTHENTICATION (With ParrelSync Support)
+    // NETWORK EVENT HANDLING (FishNet)
+    // ==========================================
+    private void SubscribeToNetworkEvents()
+    {
+        if (isSubscribedToClientEvents) return;
+
+        if (InstanceFinder.ClientManager != null)
+        {
+            InstanceFinder.ClientManager.OnClientConnectionState += OnClientConnectionStateChanged;
+            isSubscribedToClientEvents = true;
+        }
+    }
+
+    private void UnsubscribeFromNetworkEvents()
+    {
+        if (!isSubscribedToClientEvents) return;
+
+        if (InstanceFinder.ClientManager != null)
+        {
+            InstanceFinder.ClientManager.OnClientConnectionState -= OnClientConnectionStateChanged;
+        }
+        isSubscribedToClientEvents = false;
+    }
+
+    private void OnClientConnectionStateChanged(ClientConnectionStateArgs args)
+    {
+        if (args.ConnectionState == LocalConnectionState.Stopped)
+        {
+            // If we are a client in a lobby and the host disconnected / shut down the server
+            if (joinedLobby != null && hostLobby == null)
+            {
+                Debug.Log("[Lobby] Host connection stopped. Ejecting client back to lobby browser...");
+                HandleHostDisconnectedOrClosed("Host disconnected from the lobby.");
+            }
+        }
+    }
+
+    private void HandleHostDisconnectedOrClosed(string reason)
+    {
+        CancelActiveTasks();
+        joinedLobby = null;
+        hostLobby = null;
+
+        if (InstanceFinder.NetworkManager != null && InstanceFinder.IsClientStarted)
+        {
+            InstanceFinder.ClientManager.StopConnection();
+        }
+
+        OnHostDisconnected?.Invoke(reason);
+
+        // If currently in gameplay scene, transition back to Lobby scene
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Lobby")
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("Lobby");
+        }
+    }
+
+    private void CancelActiveTasks()
+    {
+        if (cancellationTokenSource != null)
+        {
+            cancellationTokenSource.Cancel();
+            cancellationTokenSource.Dispose();
+            cancellationTokenSource = null;
+        }
+    }
+
+    // ==========================================
+    // 1. AUTHENTICATION & ANTI-GHOSTING PURGE
     // ==========================================
     private async Task Authenticate()
     {
@@ -89,11 +220,54 @@ public class lobby : MonoBehaviour
                 Debug.Log($"[Lobby] Signed in successfully! Player ID: {AuthenticationService.Instance.PlayerId}");
             }
 
+            // Anti-Ghosting Protocol: Purge any stale lobby reservations from previous abrupt quits
+            await PurgeLingeringLobbies();
+
             OnAuthenticated?.Invoke();
         }
         catch (Exception e)
         {
             Debug.LogError($"[Lobby] Authentication failed: {e.Message}");
+        }
+    }
+
+    private async Task PurgeLingeringLobbies()
+    {
+        try
+        {
+            List<string> joinedLobbyIds = await LobbyService.Instance.GetJoinedLobbiesAsync();
+            if (joinedLobbyIds != null && joinedLobbyIds.Count > 0)
+            {
+                Debug.Log($"[Lobby] Found {joinedLobbyIds.Count} lingering lobby session(s). Purging ghost memberships...");
+                string playerId = AuthenticationService.Instance.PlayerId;
+
+                foreach (string lobbyId in joinedLobbyIds)
+                {
+                    try
+                    {
+                        // If we were host, delete the entire zombie lobby
+                        await LobbyService.Instance.DeleteLobbyAsync(lobbyId);
+                        Debug.Log($"[Lobby] Successfully deleted lingering host lobby: {lobbyId}");
+                    }
+                    catch (LobbyServiceException)
+                    {
+                        // If not host (Forbidden), remove ourselves as ghost player
+                        try
+                        {
+                            await LobbyService.Instance.RemovePlayerAsync(lobbyId, playerId);
+                            Debug.Log($"[Lobby] Successfully removed ghost player from lobby: {lobbyId}");
+                        }
+                        catch (Exception innerEx)
+                        {
+                            Debug.LogWarning($"[Lobby] Could not remove player from lingering lobby {lobbyId}: {innerEx.Message}");
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Lobby] Note: Could not query joined lobbies on startup: {ex.Message}");
         }
     }
 
@@ -104,6 +278,9 @@ public class lobby : MonoBehaviour
     {
         try
         {
+            CancelActiveTasks();
+            cancellationTokenSource = new CancellationTokenSource();
+
             // Step 1: Create Relay Allocation
             Allocation allocation = await RelayService.Instance.CreateAllocationAsync(maxPlayers - 1);
             string relayJoinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
@@ -134,6 +311,8 @@ public class lobby : MonoBehaviour
             Lobby createdLobby = await LobbyService.Instance.CreateLobbyAsync(lobbyName, maxPlayers, options);
             hostLobby = createdLobby;
             joinedLobby = createdLobby;
+            heartbeatTimer = 15f;
+            lobbyPollTimer = 2.5f;
 
             // Step 4: Start FishNet as Host (Server + Client)
             InstanceFinder.ServerManager.StartConnection();
@@ -141,6 +320,11 @@ public class lobby : MonoBehaviour
 
             Debug.Log($"[Lobby] Created Lobby: {createdLobby.Name} | LobbyCode: {createdLobby.LobbyCode} | Relay: {relayJoinCode}");
             return isPrivate ? createdLobby.LobbyCode : createdLobby.Id;
+        }
+        catch (LobbyServiceException e)
+        {
+            Debug.LogError($"[Lobby] Create Lobby UGS error ({e.Reason}): {e.Message}");
+            return null;
         }
         catch (Exception e)
         {
@@ -156,10 +340,20 @@ public class lobby : MonoBehaviour
     {
         try
         {
+            CancelActiveTasks();
+            cancellationTokenSource = new CancellationTokenSource();
+
             joinedLobby = await LobbyService.Instance.JoinLobbyByIdAsync(lobbyId);
+            hostLobby = null;
+            lobbyPollTimer = 2.5f;
 
             string relayJoinCode = joinedLobby.Data[KEY_RELAY_JOIN_CODE].Value;
             return await JoinRelay(relayJoinCode);
+        }
+        catch (LobbyServiceException e)
+        {
+            Debug.LogError($"[Lobby] Join Lobby by ID UGS error ({e.Reason}): {e.Message}");
+            return false;
         }
         catch (Exception e)
         {
@@ -175,10 +369,20 @@ public class lobby : MonoBehaviour
     {
         try
         {
+            CancelActiveTasks();
+            cancellationTokenSource = new CancellationTokenSource();
+
             joinedLobby = await LobbyService.Instance.JoinLobbyByCodeAsync(lobbyCode);
+            hostLobby = null;
+            lobbyPollTimer = 2.5f;
 
             string relayJoinCode = joinedLobby.Data[KEY_RELAY_JOIN_CODE].Value;
             return await JoinRelay(relayJoinCode);
+        }
+        catch (LobbyServiceException e)
+        {
+            Debug.LogError($"[Lobby] Join Lobby by Code UGS error ({e.Reason}): {e.Message}");
+            return false;
         }
         catch (Exception e)
         {
@@ -242,6 +446,11 @@ public class lobby : MonoBehaviour
             QueryResponse response = await LobbyService.Instance.QueryLobbiesAsync(options);
             return response.Results;
         }
+        catch (LobbyServiceException e)
+        {
+            Debug.LogError($"[Lobby] Query UGS error ({e.Reason}): {e.Message}");
+            return null;
+        }
         catch (Exception e)
         {
             Debug.LogError($"[Lobby] Query failed: {e.Message}");
@@ -254,38 +463,64 @@ public class lobby : MonoBehaviour
     // ==========================================
     private async void HandleLobbyHeartbeat()
     {
-        if (hostLobby == null) return;
+        if (hostLobby == null || isHeartbeatRunning) return;
 
         heartbeatTimer -= Time.deltaTime;
         if (heartbeatTimer <= 0f)
         {
             heartbeatTimer = 15f;
+            isHeartbeatRunning = true;
             try
             {
                 await LobbyService.Instance.SendHeartbeatPingAsync(hostLobby.Id);
             }
+            catch (LobbyServiceException e)
+            {
+                Debug.LogWarning($"[Lobby] Heartbeat UGS error ({e.Reason}): {e.Message}");
+            }
             catch (Exception e)
             {
                 Debug.LogWarning($"[Lobby] Heartbeat failed: {e.Message}");
+            }
+            finally
+            {
+                isHeartbeatRunning = false;
             }
         }
     }
 
     private async void HandleLobbyPollForUpdates()
     {
-        if (joinedLobby == null) return;
+        if (joinedLobby == null || isPollRunning) return;
 
         lobbyPollTimer -= Time.deltaTime;
         if (lobbyPollTimer <= 0f)
         {
-            lobbyPollTimer = 2f;
+            lobbyPollTimer = 2.5f;
+            isPollRunning = true;
             try
             {
                 joinedLobby = await LobbyService.Instance.GetLobbyAsync(joinedLobby.Id);
             }
+            catch (LobbyServiceException e)
+            {
+                if (e.Reason == LobbyExceptionReason.LobbyNotFound || e.ErrorCode == 404)
+                {
+                    Debug.LogWarning("[Lobby] Lobby no longer exists on UGS cloud. Host may have closed it.");
+                    HandleHostDisconnectedOrClosed("The lobby has been deleted by the host.");
+                }
+                else
+                {
+                    Debug.LogWarning($"[Lobby] Polling lobby UGS error ({e.Reason}): {e.Message}");
+                }
+            }
             catch (Exception e)
             {
                 Debug.LogWarning($"[Lobby] Polling lobby failed: {e.Message}");
+            }
+            finally
+            {
+                isPollRunning = false;
             }
         }
     }
@@ -293,27 +528,50 @@ public class lobby : MonoBehaviour
     // ==========================================
     // 8. LEAVE LOBBY
     // ==========================================
-    public async void LeaveLobby()
+    public async Task LeaveLobby()
     {
+        CancelActiveTasks();
+
         try
         {
             if (joinedLobby != null)
             {
-                string playerId = AuthenticationService.Instance.PlayerId;
-                await LobbyService.Instance.RemovePlayerAsync(joinedLobby.Id, playerId);
-                joinedLobby = null;
-                hostLobby = null;
+                string lobbyId = joinedLobby.Id;
+                string playerId = AuthenticationService.Instance?.PlayerId;
+                bool isHost = (hostLobby != null || (playerId != null && joinedLobby.HostId == playerId));
+
+                if (isHost)
+                {
+                    Debug.Log($"[Lobby] Host is leaving. Deleting lobby {lobbyId} from UGS cloud...");
+                    await LobbyService.Instance.DeleteLobbyAsync(lobbyId);
+                }
+                else if (!string.IsNullOrEmpty(playerId))
+                {
+                    Debug.Log($"[Lobby] Client is leaving lobby {lobbyId}...");
+                    await LobbyService.Instance.RemovePlayerAsync(lobbyId, playerId);
+                }
             }
+        }
+        catch (LobbyServiceException e)
+        {
+            Debug.LogWarning($"[Lobby] Leave lobby UGS error ({e.Reason}): {e.Message}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Lobby] Leave lobby unexpected error: {e.Message}");
+        }
+        finally
+        {
+            joinedLobby = null;
+            hostLobby = null;
 
             if (InstanceFinder.NetworkManager != null)
             {
                 if (InstanceFinder.IsServerStarted) InstanceFinder.ServerManager.StopConnection(true);
                 else if (InstanceFinder.IsClientStarted) InstanceFinder.ClientManager.StopConnection();
             }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Lobby] Leave lobby error: {e.Message}");
+
+            OnLobbyLeft?.Invoke();
         }
     }
 
