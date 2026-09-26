@@ -67,6 +67,29 @@ public class LahanManagerTilemap : NetworkBehaviour
             tileBasah = UnityEditor.AssetDatabase.LoadAssetAtPath<TileBase>("Assets/TileBasah.asset");
         }
 #endif
+        Ensure2DLightingIncludesAllLayers();
+    }
+
+    private void Ensure2DLightingIncludesAllLayers()
+    {
+        var lights = FindObjectsOfType<UnityEngine.Rendering.Universal.Light2D>();
+        if (lights == null || lights.Length == 0) return;
+
+        int[] allLayers = System.Array.ConvertAll(SortingLayer.layers, l => l.id);
+        var field = typeof(UnityEngine.Rendering.Universal.Light2D).GetField("m_ApplyToSortingLayers", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (field == null) return;
+
+        foreach (var light in lights)
+        {
+            if (light.lightType == UnityEngine.Rendering.Universal.Light2D.LightType.Global)
+            {
+                int[] current = field.GetValue(light) as int[];
+                if (current == null || current.Length < allLayers.Length)
+                {
+                    field.SetValue(light, allLayers);
+                }
+            }
+        }
     }
 
     public override void OnSpawnServer(NetworkConnection connection)
