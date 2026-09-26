@@ -6,6 +6,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
 using FishNet.Object;
+using UnityEngine.Tilemaps;
 
 public static class LobbyUIAutoBuilder
 {
@@ -443,6 +444,49 @@ public static class LobbyUIAutoBuilder
         // Load Player.prefab NetworkObject
         NetworkObject playerNob = AssetDatabase.LoadAssetAtPath<NetworkObject>("Assets/Player.prefab");
         spawner.SetEditorReferences(playerNob, new Transform[] { sp1.transform, sp2.transform });
+
+        // 5. Ensure Grid & TilemapLahan exist
+        GameObject gridObj = GameObject.Find("Grid");
+        if (gridObj == null)
+        {
+            gridObj = new GameObject("Grid");
+            gridObj.AddComponent<Grid>();
+        }
+
+        GameObject tilemapObj = GameObject.Find("TilemapLahan");
+        if (tilemapObj == null)
+        {
+            tilemapObj = new GameObject("TilemapLahan");
+            tilemapObj.transform.SetParent(gridObj.transform, false);
+            Tilemap tm = tilemapObj.AddComponent<Tilemap>();
+            TilemapRenderer tmr = tilemapObj.AddComponent<TilemapRenderer>();
+            Material defaultSpriteMat = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Sprite.mat");
+            if (defaultSpriteMat != null) tmr.material = defaultSpriteMat;
+        }
+
+        // 6. Ensure GameManager prefab instance exists in scene
+        GameObject gameManagerObj = GameObject.Find("GameManager");
+        if (gameManagerObj == null)
+        {
+            GameObject gmPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GameManager.prefab");
+            if (gmPrefab != null)
+            {
+                gameManagerObj = (GameObject)PrefabUtility.InstantiatePrefab(gmPrefab);
+                gameManagerObj.name = "GameManager";
+            }
+        }
+
+        if (gameManagerObj != null)
+        {
+            LahanManagerTilemap lmt = gameManagerObj.GetComponent<LahanManagerTilemap>();
+            if (lmt != null)
+            {
+                if (tilemapObj != null) lmt.tilemapLahan = tilemapObj.GetComponent<Tilemap>();
+                if (lmt.tileKering == null) lmt.tileKering = AssetDatabase.LoadAssetAtPath<TileBase>("Assets/TileKering.asset");
+                if (lmt.tileBasah == null) lmt.tileBasah = AssetDatabase.LoadAssetAtPath<TileBase>("Assets/TileBasah.asset");
+                EditorUtility.SetDirty(lmt);
+            }
+        }
 
         // Save SampleScene
         EditorSceneManager.MarkSceneDirty(scene);

@@ -34,6 +34,10 @@ namespace Farming
         [Tooltip("Layer obstacle atau tanaman lain untuk mencegah penanaman bertumpuk atau menembus tembok.")]
         [SerializeField] private LayerMask blockedLayers;
 
+        [Header("Integrasi Lahan")]
+        [Tooltip("Jika true, benih hanya dapat ditanam pada petak yang sudah dicangkul.")]
+        [SerializeField] private bool requireTilledSoil = false;
+
         private PlayerMovement _playerMovement;
         private IPlacementStrategy _placementStrategy;
 
@@ -79,10 +83,19 @@ namespace Farming
         }
 
         /// <summary>
-        /// Menghitung koordinat posisi target di depan pemain menggunakan strategi yang dipilih.
+        /// Menghitung koordinat posisi target di depan pemain menggunakan strategi yang dipilih atau LahanManagerTilemap.
         /// </summary>
         public Vector2 GetTargetPosition(Vector2 facingDir)
         {
+            if (LahanManagerTilemap.Instance != null)
+            {
+                Vector2 dir = facingDir != Vector2.zero ? facingDir.normalized : Vector2.down;
+                Vector3 rawTarget = transform.position + (Vector3)(dir * reachDistance);
+                Vector3Int cellPos = LahanManagerTilemap.Instance.WorldToCell(rawTarget);
+                Vector3 center = LahanManagerTilemap.Instance.GetCellCenterWorld(cellPos);
+                return new Vector2(center.x, center.y);
+            }
+
             if (_placementStrategy == null) UpdateStrategy();
             return _placementStrategy.CalculatePosition(transform.position, facingDir, reachDistance, gridSize);
         }
@@ -110,7 +123,17 @@ namespace Farming
                 return;
             }
 
-            // 3. Validasi Halangan / Tumpang Tindih (Cegah menanam di tembok atau di atas tanaman lain)
+            // 3. Validasi Tanah Garapan (Opsional: harus dicangkul terlebih dahulu)
+            if (requireTilledSoil && LahanManagerTilemap.Instance != null)
+            {
+                if (!LahanManagerTilemap.Instance.IsPetakDicangkul(targetPosition))
+                {
+                    Debug.LogWarning($"[PlayerPlanter] Permintaan tanam ditolak: Petak {targetPosition} belum dicangkul.");
+                    return;
+                }
+            }
+
+            // 4. Validasi Halangan / Tumpang Tindih (Cegah menanam di tembok atau di atas tanaman lain)
             Collider2D overlap = Physics2D.OverlapCircle(targetPosition, 0.2f, blockedLayers);
             if (overlap != null)
             {
@@ -118,7 +141,7 @@ namespace Farming
                 return;
             }
 
-            // 4. Instansiasi & Network Spawn di Server
+            // 5. Instansiasi & Network Spawn di Server
             GameObject spawnedPlant = Instantiate(plantPrefab, targetPosition, Quaternion.identity);
             
             // Spawn ke seluruh jaringan menggunakan FishNet ServerManager
