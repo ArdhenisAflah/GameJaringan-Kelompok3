@@ -8,6 +8,7 @@ public class InfoPetak
 {
     public bool sudahDicangkul;
     public bool sudahDisiram;
+    public GameObject tanaman;
 }
 
 public class LahanManagerTilemap : NetworkBehaviour
@@ -92,6 +93,53 @@ public class LahanManagerTilemap : NetworkBehaviour
     {
         Vector3Int gridPos = WorldToCell(worldPos);
         return dataGrid.TryGetValue(gridPos, out InfoPetak p) && p.sudahDisiram;
+    }
+
+    public InfoPetak GetOrCreateInfoPetak(Vector3Int gridPos)
+    {
+        if (!dataGrid.TryGetValue(gridPos, out InfoPetak petak))
+        {
+            petak = new InfoPetak();
+            dataGrid.Add(gridPos, petak);
+        }
+        return petak;
+    }
+
+    public bool IsPetakDitanam(Vector3 worldPos)
+    {
+        Vector3Int gridPos = WorldToCell(worldPos);
+        return IsPetakDitanam(gridPos);
+    }
+
+    public bool IsPetakDitanam(Vector3Int gridPos)
+    {
+        return dataGrid.TryGetValue(gridPos, out InfoPetak p) && p.tanaman != null;
+    }
+
+    public void DaftarkanTanaman(Vector3 worldPos, GameObject tanamanObj)
+    {
+        Vector3Int gridPos = WorldToCell(worldPos);
+        DaftarkanTanaman(gridPos, tanamanObj);
+    }
+
+    public void DaftarkanTanaman(Vector3Int gridPos, GameObject tanamanObj)
+    {
+        InfoPetak petak = GetOrCreateInfoPetak(gridPos);
+        petak.tanaman = tanamanObj;
+    }
+
+    public void HapusTanaman(Vector3 worldPos)
+    {
+        Vector3Int gridPos = WorldToCell(worldPos);
+        HapusTanaman(gridPos);
+    }
+
+    public void HapusTanaman(Vector3Int gridPos)
+    {
+        if (dataGrid.TryGetValue(gridPos, out InfoPetak p))
+        {
+            p.tanaman = null;
+        }
     }
 
     // --- FITUR CANGKUL ---

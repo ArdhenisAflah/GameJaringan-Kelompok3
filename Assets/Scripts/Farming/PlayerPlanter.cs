@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using FishNet.Object;
 using Farming.Placement;
@@ -38,6 +39,12 @@ namespace Farming
         [Tooltip("Jika true, benih hanya dapat ditanam pada petak yang sudah dicangkul.")]
         [SerializeField] private bool requireTilledSoil = false;
 
+        [Tooltip("Jeda waktu minimal (detik) antar aksi menanam untuk mencegah double input.")]
+        [SerializeField] private float plantCooldown = 0.25f;
+
+        private float _lastPlantTime;
+        private static readonly Dictionary<Vector2Int, GameObject> _fallbackOccupiedCells = new Dictionary<Vector2Int, GameObject>();
+
         private PlayerMovement _playerMovement;
         private IPlacementStrategy _placementStrategy;
 
@@ -64,8 +71,9 @@ namespace Farming
             // Hanya client pemilik karakter yang berhak membaca input lokal
             if (!IsOwner) return;
 
-            if (Input.GetKeyDown(plantKey))
+            if (Input.GetKeyDown(plantKey) && Time.time >= _lastPlantTime + plantCooldown)
             {
+                _lastPlantTime = Time.time;
                 RequestPlantAction();
             }
         }
@@ -133,17 +141,53 @@ namespace Farming
                 }
             }
 
-            // 4. Validasi Halangan / Tumpang Tindih (Cegah menanam di tembok atau di atas tanaman lain)
-            Collider2D overlap = Physics2D.OverlapCircle(targetPosition, 0.2f, blockedLayers);
-            if (overlap != null)
+            // 4. Validasi Okupansi Grid (Mencegah penanaman ganda di petak yang sama)
+            if (LahanManagerTilemap.Instance != null)
             {
-                Debug.LogWarning($"[PlayerPlanter] Permintaan tanam ditolak: Titik {targetPosition} terhalang oleh {overlap.name}.");
-                return;
+                if (LahanManagerTilemap.Instance.IsPetakDitanam(targetPosition))
+                {
+                    Debug.LogWarning($"[PlayerPlanter] Permintaan tanam ditolak: Petak {targetPosition} sudah ditanami!");
+                    return;
+                }
+            }
+            else
+            {
+                Vector2Int fallbackKey = new Vector2Int(Mathf.RoundToInt(targetPosition.x), Mathf.RoundToInt(targetPosition.y));
+                if (_fallbackOccupiedCells.TryGetValue(fallbackKey, out GameObject existing) && existing != null)
+                {
+                    Debug.LogWarning($"[PlayerPlanter] Permintaan tanam ditolak: Koordinat {fallbackKey} sudah memiliki tanaman!");
+                    return;
+                }
             }
 
-            // 5. Instansiasi & Network Spawn di Server
+            // 5. Validasi Halangan Fisik (Obstacle tembok dll, abaikan collider karakter sendiri)
+            if (blockedLayers.value != 0)
+            {
+                Collider2D overlap = Physics2D.OverlapCircle(targetPosition, 0.2f, blockedLayers);
+                if (overlap != null && overlap.gameObject != gameObject)
+                {
+                    Debug.LogWarning($"[PlayerPlanter] Permintaan tanam ditolak: Titik {targetPosition} terhalang oleh {overlap.name}.");
+                    return;
+                }
+            }
+
+            // 6. Instansiasi & Network Spawn di Server
             GameObject spawnedPlant = Instantiate(plantPrefab, targetPosition, Quaternion.identity);
             
+            // Daftarkan tanaman ke sistem okupansi grid
+            if (LahanManagerTilemap.Instance != null)
+            {
+                LahanManagerTilemap.Instance.DaftarkanTanaman(targetPosition, spawnedPlant);
+            }
+            else
+            {
+                Vector2Int fallbackKey = new Vector2Int(Mathf.RoundToInt(targetPosition.x), Mathf.RoundToInt(targetPosition.y));
+                _fallbackOccupiedCells[fallbackKey] = spawnedPlant;
+            }
+
+            // Sinkronisasi transform physics Box2D
+            Physics2D.SyncTransforms();
+
             // Spawn ke seluruh jaringan menggunakan FishNet ServerManager
             ServerManager.Spawn(spawnedPlant);
         }
