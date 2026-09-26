@@ -51,6 +51,11 @@ namespace Farming
         private void OnDestroy()
         {
             _growthStage.OnChange -= OnGrowthStageChanged;
+
+            if (IsServerStarted && LahanManagerTilemap.Instance != null)
+            {
+                LahanManagerTilemap.Instance.HapusTanaman(transform.position);
+            }
         }
 
         public override void OnStartServer()
