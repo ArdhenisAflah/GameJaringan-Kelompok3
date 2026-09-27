@@ -36,8 +36,8 @@ namespace Farming
         [SerializeField] private LayerMask blockedLayers;
 
         [Header("Integrasi Lahan")]
-        [Tooltip("Jika true, benih hanya dapat ditanam pada petak yang sudah dicangkul.")]
-        [SerializeField] private bool requireTilledSoil = false;
+        [Tooltip("Jika true, benih hanya dapat ditanam pada petak yang sudah memiliki TileKering.")]
+        [SerializeField] private bool requireTilledSoil = true;
 
         [Tooltip("Jeda waktu minimal (detik) antar aksi menanam untuk mencegah double input.")]
         [SerializeField] private float plantCooldown = 0.25f;
@@ -86,6 +86,21 @@ namespace Farming
             Vector2 facingDir = _playerMovement != null ? _playerMovement.FacingDirection : Vector2.down;
             Vector2 targetPosition = GetTargetPosition(facingDir);
 
+            // Validasi lokal: Jangan kirim RPC jika petak belum memiliki TileKering atau sudah terisi tanaman
+            if (requireTilledSoil && LahanManagerTilemap.Instance != null)
+            {
+                if (!LahanManagerTilemap.Instance.HasTileKering(targetPosition))
+                {
+                    Debug.Log("[PlayerPlanter] Tidak bisa menanam: Petak belum dicangkul (belum ada TileKering).");
+                    return;
+                }
+                if (LahanManagerTilemap.Instance.IsPetakDitanam(targetPosition))
+                {
+                    Debug.Log("[PlayerPlanter] Tidak bisa menanam: Petak sudah memiliki tanaman.");
+                    return;
+                }
+            }
+
             // Kirim permintaan ke Server (Server-Authoritative)
             ServerPlant(targetPosition);
         }
@@ -131,12 +146,12 @@ namespace Farming
                 return;
             }
 
-            // 3. Validasi Tanah Garapan (Opsional: harus dicangkul terlebih dahulu)
-            if (requireTilledSoil && LahanManagerTilemap.Instance != null)
+            // 3. Validasi Tanah Garapan (Wajib memiliki TileKering terlebih dahulu)
+            if (requireTilledSoil)
             {
-                if (!LahanManagerTilemap.Instance.IsPetakDicangkul(targetPosition))
+                if (LahanManagerTilemap.Instance == null || !LahanManagerTilemap.Instance.HasTileKering(targetPosition))
                 {
-                    Debug.LogWarning($"[PlayerPlanter] Permintaan tanam ditolak: Petak {targetPosition} belum dicangkul.");
+                    Debug.LogWarning($"[PlayerPlanter] Permintaan tanam ditolak: Petak {targetPosition} belum memiliki TileKering (belum dicangkul).");
                     return;
                 }
             }
