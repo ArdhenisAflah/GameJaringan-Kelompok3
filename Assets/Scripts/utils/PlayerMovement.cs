@@ -17,6 +17,9 @@ public class PlayerMovement : NetworkBehaviour
     /// Digunakan oleh sistem aksi (seperti PlayerPlanter) untuk menentukan titik di depan pemain.
     /// Default menghadap ke bawah (Vector2.down).
     /// </summary>
+    /// 
+    /// // Mengetahui apakah karakter sedang bergerak atau diam
+    public bool IsMoving => movement.sqrMagnitude > 0.01f;
     public Vector2 FacingDirection { get; private set; } = Vector2.down;
 
     private void Awake()
