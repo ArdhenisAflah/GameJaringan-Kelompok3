@@ -126,12 +126,53 @@ public class LahanManagerTilemap : NetworkBehaviour
     public bool IsPetakDicangkul(Vector3 worldPos)
     {
         Vector3Int gridPos = WorldToCell(worldPos);
-        return dataGrid.TryGetValue(gridPos, out InfoPetak p) && p.sudahDicangkul;
+        return IsPetakDicangkul(gridPos);
+    }
+
+    public bool IsPetakDicangkul(Vector3Int gridPos)
+    {
+        return HasTileKering(gridPos);
+    }
+
+    public bool HasTileKering(Vector3 worldPos)
+    {
+        Vector3Int gridPos = WorldToCell(worldPos);
+        return HasTileKering(gridPos);
+    }
+
+    public bool HasTileKering(Vector3Int gridPos)
+    {
+        // 1. Cek dari dictionary state jaringan
+        if (dataGrid.TryGetValue(gridPos, out InfoPetak p) && p.sudahDicangkul)
+            return true;
+
+        // 2. Cek apakah ada TileKering pada TilemapTanah
+        if (tilemapTanah != null)
+        {
+            TileBase t = tilemapTanah.GetTile(gridPos);
+            if (t != null && (tileKering == null || t == tileKering || t.name == "TileKering"))
+                return true;
+        }
+
+        // 3. Fallback jika menggunakan single tilemap
+        if (tilemapLahan != null)
+        {
+            TileBase t = tilemapLahan.GetTile(gridPos);
+            if (t != null && (tileKering == null || t == tileKering || t.name == "TileKering" || t == tileBasah || t.name == "TileBasah"))
+                return true;
+        }
+
+        return false;
     }
 
     public bool IsPetakDisiram(Vector3 worldPos)
     {
         Vector3Int gridPos = WorldToCell(worldPos);
+        return IsPetakDisiram(gridPos);
+    }
+
+    public bool IsPetakDisiram(Vector3Int gridPos)
+    {
         return dataGrid.TryGetValue(gridPos, out InfoPetak p) && p.sudahDisiram;
     }
 
@@ -140,6 +181,10 @@ public class LahanManagerTilemap : NetworkBehaviour
         if (!dataGrid.TryGetValue(gridPos, out InfoPetak petak))
         {
             petak = new InfoPetak();
+            if (HasTileKering(gridPos))
+            {
+                petak.sudahDicangkul = true;
+            }
             dataGrid.Add(gridPos, petak);
         }
         return petak;

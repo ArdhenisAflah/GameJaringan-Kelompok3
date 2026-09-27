@@ -278,6 +278,7 @@ MonoBehaviour:
   blockedLayers:
     serializedVersion: 2
     m_Bits: 0
+  requireTilledSoil: 1
 --- !u!114 &4584013604512825916
 MonoBehaviour:
   m_ObjectHideFlags: 0
