@@ -58,7 +58,10 @@ public class PlayerAnimation : NetworkBehaviour
         }
 
         _lastPosition = transform.position;
-        _animator.SetBool(IsWalkingHash, isMoving);
+        if (_animator != null && _animator.runtimeAnimatorController != null)
+        {
+            _animator.SetBool(IsWalkingHash, isMoving);
+        }
     }
 
     [ServerRpc]
