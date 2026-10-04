@@ -180,6 +180,26 @@ namespace SiloSystem
             UpdatePromptText();
             OnSiloOpened?.Invoke();
 
+            // Panggil UI Silo secara eksplisit dan fail-safe
+            UI.SiloUI ui = UI.SiloUI.Instance;
+            if (ui == null)
+            {
+                ui = FindObjectOfType<UI.SiloUI>(true);
+            }
+            if (ui == null)
+            {
+                ui = UI.SiloUI.CreateRuntimeCanvasUI();
+            }
+
+            if (ui != null)
+            {
+                ui.OpenUI(siloStorage, this);
+            }
+            else
+            {
+                Debug.LogError("[SiloInteraction] SiloUI tidak dapat ditemukan atau dibuat!");
+            }
+
             int totalStok = siloStorage != null ? siloStorage.GetTotalItemCount() : 0;
             Debug.Log($"<color=yellow>[Silo]</color> Silo Terbuka! Total hasil panen tersimpan: {totalStok} unit. Tekan '{interactKey}' untuk menutup.");
         }
@@ -189,6 +209,11 @@ namespace SiloSystem
             _isOpen = false;
             UpdatePromptText();
             OnSiloClosed?.Invoke();
+
+            if (UI.SiloUI.Instance != null && UI.SiloUI.Instance.IsOpen)
+            {
+                UI.SiloUI.Instance.CloseUI();
+            }
 
             Debug.Log($"<color=yellow>[Silo]</color> Silo Ditutup.");
         }

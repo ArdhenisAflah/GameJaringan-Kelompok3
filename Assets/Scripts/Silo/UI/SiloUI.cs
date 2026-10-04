@@ -48,6 +48,8 @@ namespace SiloSystem.UI
         private float _feedbackTimer = 0f;
         private readonly List<SiloItemCard> _spawnedCards = new();
 
+        public bool IsOpen => panelRoot != null ? panelRoot.activeSelf : gameObject.activeSelf;
+
         private void Awake()
         {
             if (Instance == null)
@@ -57,41 +59,59 @@ namespace SiloSystem.UI
 
             AutoDiscoverPanelReferences();
 
-            if (panelRoot == null)
-            {
-                panelRoot = gameObject;
-            }
-
             if (closeButton != null)
             {
+                closeButton.onClick.RemoveAllListeners();
                 closeButton.onClick.AddListener(CloseUI);
             }
 
             if (depositHeldItemButton != null)
             {
+                depositHeldItemButton.onClick.RemoveAllListeners();
                 depositHeldItemButton.onClick.AddListener(HandleDepositHeldItemClicked);
             }
 
-            // Mulai dalam keadaan tertutup
-            panelRoot.SetActive(false);
+            LoadItemDatabaseIfNeeded();
+            FindAndBindSilo();
+
+            // Sembunyikan panel modal awal jika sudah terpasang
+            if (panelRoot != null && panelRoot != gameObject)
+            {
+                panelRoot.SetActive(false);
+            }
+
             if (feedbackText != null) feedbackText.gameObject.SetActive(false);
         }
 
         public void AutoDiscoverPanelReferences()
         {
-            if (panelRoot == null) panelRoot = gameObject;
-            if (titleText == null) titleText = transform.Find("TitleText")?.GetComponent<TextMeshProUGUI>();
-            if (capacityText == null) capacityText = transform.Find("CapacityText")?.GetComponent<TextMeshProUGUI>();
-            if (closeButton == null) closeButton = transform.Find("CloseButton")?.GetComponent<Button>();
-            if (itemContainer == null) itemContainer = transform.Find("ItemContainer") ?? transform.Find("Scroll View/Viewport/Content") ?? transform.Find("Content");
-            if (playerHandStatusText == null) playerHandStatusText = transform.Find("PlayerHandStatusText")?.GetComponent<TextMeshProUGUI>();
-            if (depositHeldItemButton == null) depositHeldItemButton = transform.Find("DepositHeldItemButton")?.GetComponent<Button>();
-            if (feedbackText == null) feedbackText = transform.Find("FeedbackText")?.GetComponent<TextMeshProUGUI>();
+            if (panelRoot == null)
+            {
+                Transform foundChild = transform.Find("SiloUIPanel");
+                panelRoot = foundChild != null ? foundChild.gameObject : gameObject;
+            }
+
+            Transform searchRoot = (panelRoot != null) ? panelRoot.transform : transform;
+
+            if (titleText == null) titleText = searchRoot.Find("TitleText")?.GetComponent<TextMeshProUGUI>();
+            if (capacityText == null) capacityText = searchRoot.Find("CapacityText")?.GetComponent<TextMeshProUGUI>();
+            if (closeButton == null) closeButton = searchRoot.Find("CloseButton")?.GetComponent<Button>();
+            if (itemContainer == null)
+            {
+                itemContainer = searchRoot.Find("ItemScrollView/Viewport/ItemContainer") 
+                    ?? searchRoot.Find("ItemContainer") 
+                    ?? searchRoot.Find("Scroll View/Viewport/Content") 
+                    ?? searchRoot.Find("Content");
+            }
+            if (playerHandStatusText == null) playerHandStatusText = searchRoot.Find("PlayerHandStatusText")?.GetComponent<TextMeshProUGUI>();
+            if (depositHeldItemButton == null) depositHeldItemButton = searchRoot.Find("DepositHeldItemButton")?.GetComponent<Button>();
+            if (feedbackText == null) feedbackText = searchRoot.Find("FeedbackText")?.GetComponent<TextMeshProUGUI>();
         }
 
         private void Start()
         {
             FindAndBindSilo();
+            LoadItemDatabaseIfNeeded();
         }
 
         private void OnDestroy()
@@ -133,7 +153,7 @@ namespace SiloSystem.UI
             }
 
             // Shortcut ESC untuk menutup UI jika sedang terbuka
-            if (panelRoot.activeSelf && Input.GetKeyDown(KeyCode.Escape))
+            if (IsOpen && Input.GetKeyDown(KeyCode.Escape))
             {
                 CloseUI();
             }
@@ -205,19 +225,45 @@ namespace SiloSystem.UI
 
         public void OpenUI()
         {
+            OpenUI(null, null);
+        }
+
+        public void OpenUI(SiloStorage storage, SiloInteractionTrigger trigger)
+        {
+            if (storage != null) _activeSilo = storage;
+            if (trigger != null) _activeTrigger = trigger;
+
             if (_activeSilo == null)
             {
                 FindAndBindSilo();
             }
 
             TryBindLocalPlayer();
-            panelRoot.SetActive(true);
+
+            if (panelRoot != null)
+            {
+                panelRoot.SetActive(true);
+            }
+            else
+            {
+                gameObject.SetActive(true);
+            }
+
             RefreshUI();
+            Debug.Log($"<color=green>[SiloUI]</color> Silo UI terbuka untuk '{(_activeSilo != null ? _activeSilo.SiloName : "Lumbung")}'.");
         }
 
         public void CloseUI()
         {
-            panelRoot.SetActive(false);
+            if (panelRoot != null)
+            {
+                panelRoot.SetActive(false);
+            }
+            else
+            {
+                gameObject.SetActive(false);
+            }
+
             if (_activeTrigger != null && _activeTrigger.IsOpen)
             {
                 _activeTrigger.CloseSilo();
@@ -226,7 +272,14 @@ namespace SiloSystem.UI
 
         private void HandleTriggerClosed()
         {
-            panelRoot.SetActive(false);
+            if (panelRoot != null)
+            {
+                panelRoot.SetActive(false);
+            }
+            else
+            {
+                gameObject.SetActive(false);
+            }
         }
 
         /// <summary>
@@ -234,7 +287,7 @@ namespace SiloSystem.UI
         /// </summary>
         public void RefreshUI()
         {
-            if (!panelRoot.activeSelf || _activeSilo == null) return;
+            if (!IsOpen || _activeSilo == null) return;
 
             // 1. Perbarui Info Kapasitas
             int totalTersimpan = _activeSilo.GetTotalItemCount();
@@ -478,17 +531,63 @@ namespace SiloSystem.UI
             return cardGo;
         }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void InitSceneLoadedHook()
+        {
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        private static void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            // Jika ada SiloStorage di scene dan belum ada SiloUI, buat Canvas UI runtime otomatis
+            if (FindObjectOfType<SiloStorage>() != null && Instance == null)
+            {
+                CreateRuntimeCanvasUI();
+            }
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureRuntimeUI()
         {
             if (FindObjectOfType<SiloStorage>() == null) return;
-            if (FindObjectOfType<SiloUI>() != null) return;
+            if (Instance != null) return;
 
             CreateRuntimeCanvasUI();
         }
 
+        public void LoadItemDatabaseIfNeeded()
+        {
+            if (itemDatabase.Count > 0) return;
+
+            var loaded = Resources.LoadAll<HarvestItemData>("HarvestItems");
+            if (loaded != null && loaded.Length > 0)
+            {
+                itemDatabase.AddRange(loaded);
+            }
+
+#if UNITY_EDITOR
+            if (itemDatabase.Count == 0)
+            {
+                string[] guids = UnityEditor.AssetDatabase.FindAssets("t:HarvestItemData", new[] { "Assets/Data/HarvestItems" });
+                for (int i = 0; i < guids.Length; i++)
+                {
+                    string p = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[i]);
+                    HarvestItemData item = UnityEditor.AssetDatabase.LoadAssetAtPath<HarvestItemData>(p);
+                    if (item != null && !itemDatabase.Contains(item))
+                    {
+                        itemDatabase.Add(item);
+                    }
+                }
+            }
+#endif
+        }
+
         public static SiloUI CreateRuntimeCanvasUI()
         {
+            if (Instance != null) return Instance;
+
+            // 1. Pastikan EventSystem ada di scene untuk penerimaan klik UI
             if (FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
             {
                 GameObject es = new GameObject("EventSystem");
@@ -496,180 +595,231 @@ namespace SiloSystem.UI
                 es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
             }
 
+            // 2. Buat atau temukan Canvas
+            GameObject canvasGo = null;
             Canvas canvas = FindObjectOfType<Canvas>();
             if (canvas == null)
             {
-                GameObject canvasGo = new GameObject("SiloCanvas");
+                canvasGo = new GameObject("SiloCanvas");
                 canvas = canvasGo.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                canvasGo.AddComponent<CanvasScaler>();
+                canvas.sortingOrder = 100;
+
+                CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(1920, 1080);
+
                 canvasGo.AddComponent<GraphicRaycaster>();
             }
+            else
+            {
+                canvasGo = canvas.gameObject;
+                if (canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                {
+                    canvas.sortingOrder = Mathf.Max(canvas.sortingOrder, 100);
+                }
+            }
 
-            GameObject panelObj = new GameObject("SiloUIPanel");
-            panelObj.transform.SetParent(canvas.transform, false);
-            RectTransform panelRect = panelObj.AddComponent<RectTransform>();
-            panelRect.sizeDelta = new Vector2(860, 560);
+            // 3. Pasang komponen SiloUI pada Canvas agar SELALU AKTIF di hierarki scene
+            SiloUI ui = canvasGo.GetComponent<SiloUI>();
+            if (ui == null)
+            {
+                ui = canvasGo.AddComponent<SiloUI>();
+            }
 
-            Image panelImg = panelObj.AddComponent<Image>();
-            panelImg.color = new Color(0.10f, 0.12f, 0.18f, 0.96f);
+            // 4. Buat Modal Panel Root (SiloUIPanel) sebagai anak Canvas
+            Transform existingPanel = canvas.transform.Find("SiloUIPanel");
+            GameObject panelObj;
+            if (existingPanel != null)
+            {
+                panelObj = existingPanel.gameObject;
+            }
+            else
+            {
+                panelObj = new GameObject("SiloUIPanel");
+                panelObj.transform.SetParent(canvas.transform, false);
+                RectTransform panelRect = panelObj.AddComponent<RectTransform>();
+                panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+                panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+                panelRect.pivot = new Vector2(0.5f, 0.5f);
+                panelRect.anchoredPosition = Vector2.zero;
+                panelRect.sizeDelta = new Vector2(860, 560);
 
-            // Title
-            GameObject titleGo = new GameObject("TitleText");
-            titleGo.transform.SetParent(panelObj.transform, false);
-            RectTransform tRect = titleGo.AddComponent<RectTransform>();
-            tRect.anchorMin = new Vector2(0, 1);
-            tRect.anchorMax = new Vector2(1, 1);
-            tRect.pivot = new Vector2(0.5f, 1);
-            tRect.anchoredPosition = new Vector2(0, -20);
-            tRect.sizeDelta = new Vector2(0, 40);
-            TextMeshProUGUI tTmp = titleGo.AddComponent<TextMeshProUGUI>();
-            tTmp.text = "LUMBUNG PANEN (SILO)";
-            tTmp.fontSize = 28;
-            tTmp.fontStyle = FontStyles.Bold;
-            tTmp.alignment = TextAlignmentOptions.Center;
-            tTmp.color = Color.white;
+                Image panelImg = panelObj.AddComponent<Image>();
+                panelImg.color = new Color(0.10f, 0.12f, 0.18f, 0.96f);
 
-            // Capacity
-            GameObject capGo = new GameObject("CapacityText");
-            capGo.transform.SetParent(panelObj.transform, false);
-            RectTransform cRect = capGo.AddComponent<RectTransform>();
-            cRect.anchorMin = new Vector2(0, 1);
-            cRect.anchorMax = new Vector2(1, 1);
-            cRect.pivot = new Vector2(0.5f, 1);
-            cRect.anchoredPosition = new Vector2(0, -65);
-            cRect.sizeDelta = new Vector2(0, 30);
-            TextMeshProUGUI cTmp = capGo.AddComponent<TextMeshProUGUI>();
-            cTmp.text = "Kapasitas: 0 / 999 unit";
-            cTmp.fontSize = 16;
-            cTmp.alignment = TextAlignmentOptions.Center;
-            cTmp.color = new Color(1f, 0.85f, 0.3f, 1f);
+                // Title
+                GameObject titleGo = new GameObject("TitleText");
+                titleGo.transform.SetParent(panelObj.transform, false);
+                RectTransform tRect = titleGo.AddComponent<RectTransform>();
+                tRect.anchorMin = new Vector2(0, 1);
+                tRect.anchorMax = new Vector2(1, 1);
+                tRect.pivot = new Vector2(0.5f, 1);
+                tRect.anchoredPosition = new Vector2(0, -20);
+                tRect.sizeDelta = new Vector2(0, 40);
+                TextMeshProUGUI tTmp = titleGo.AddComponent<TextMeshProUGUI>();
+                tTmp.text = "LUMBUNG PANEN (SILO)";
+                tTmp.fontSize = 28;
+                tTmp.fontStyle = FontStyles.Bold;
+                tTmp.alignment = TextAlignmentOptions.Center;
+                tTmp.color = Color.white;
 
-            // Close Button
-            GameObject closeGo = new GameObject("CloseButton");
-            closeGo.transform.SetParent(panelObj.transform, false);
-            RectTransform clRect = closeGo.AddComponent<RectTransform>();
-            clRect.anchorMin = new Vector2(1, 1);
-            clRect.anchorMax = new Vector2(1, 1);
-            clRect.pivot = new Vector2(1, 1);
-            clRect.anchoredPosition = new Vector2(-15, -15);
-            clRect.sizeDelta = new Vector2(40, 40);
-            Image clImg = closeGo.AddComponent<Image>();
-            clImg.color = new Color(0.85f, 0.25f, 0.25f, 1f);
-            closeGo.AddComponent<Button>();
+                // Capacity
+                GameObject capGo = new GameObject("CapacityText");
+                capGo.transform.SetParent(panelObj.transform, false);
+                RectTransform cRect = capGo.AddComponent<RectTransform>();
+                cRect.anchorMin = new Vector2(0, 1);
+                cRect.anchorMax = new Vector2(1, 1);
+                cRect.pivot = new Vector2(0.5f, 1);
+                cRect.anchoredPosition = new Vector2(0, -65);
+                cRect.sizeDelta = new Vector2(0, 30);
+                TextMeshProUGUI cTmp = capGo.AddComponent<TextMeshProUGUI>();
+                cTmp.text = "Kapasitas: 0 / 999 unit";
+                cTmp.fontSize = 16;
+                cTmp.alignment = TextAlignmentOptions.Center;
+                cTmp.color = new Color(1f, 0.85f, 0.3f, 1f);
 
-            GameObject clTxtGo = new GameObject("Text");
-            clTxtGo.transform.SetParent(closeGo.transform, false);
-            RectTransform cltRect = clTxtGo.AddComponent<RectTransform>();
-            cltRect.sizeDelta = clRect.sizeDelta;
-            TextMeshProUGUI clTmp = clTxtGo.AddComponent<TextMeshProUGUI>();
-            clTmp.text = "X";
-            clTmp.fontSize = 20;
-            clTmp.fontStyle = FontStyles.Bold;
-            clTmp.alignment = TextAlignmentOptions.Center;
-            clTmp.color = Color.white;
+                // Close Button
+                GameObject closeGo = new GameObject("CloseButton");
+                closeGo.transform.SetParent(panelObj.transform, false);
+                RectTransform clRect = closeGo.AddComponent<RectTransform>();
+                clRect.anchorMin = new Vector2(1, 1);
+                clRect.anchorMax = new Vector2(1, 1);
+                clRect.pivot = new Vector2(1, 1);
+                clRect.anchoredPosition = new Vector2(-15, -15);
+                clRect.sizeDelta = new Vector2(40, 40);
+                Image clImg = closeGo.AddComponent<Image>();
+                clImg.color = new Color(0.85f, 0.25f, 0.25f, 1f);
+                Button clBtn = closeGo.AddComponent<Button>();
 
-            // Scroll View
-            GameObject scrollGo = new GameObject("ItemScrollView");
-            scrollGo.transform.SetParent(panelObj.transform, false);
-            RectTransform sRect = scrollGo.AddComponent<RectTransform>();
-            sRect.anchorMin = new Vector2(0, 0);
-            sRect.anchorMax = new Vector2(1, 1);
-            sRect.offsetMin = new Vector2(25, 90);
-            sRect.offsetMax = new Vector2(-25, -105);
+                GameObject clTxtGo = new GameObject("Text");
+                clTxtGo.transform.SetParent(closeGo.transform, false);
+                RectTransform cltRect = clTxtGo.AddComponent<RectTransform>();
+                cltRect.sizeDelta = clRect.sizeDelta;
+                TextMeshProUGUI clTmp = clTxtGo.AddComponent<TextMeshProUGUI>();
+                clTmp.text = "X";
+                clTmp.fontSize = 20;
+                clTmp.fontStyle = FontStyles.Bold;
+                clTmp.alignment = TextAlignmentOptions.Center;
+                clTmp.color = Color.white;
 
-            Image sBg = scrollGo.AddComponent<Image>();
-            sBg.color = new Color(0.06f, 0.08f, 0.12f, 0.85f);
-            ScrollRect sr = scrollGo.AddComponent<ScrollRect>();
-            sr.horizontal = true;
-            sr.vertical = false;
+                // Scroll View
+                GameObject scrollGo = new GameObject("ItemScrollView");
+                scrollGo.transform.SetParent(panelObj.transform, false);
+                RectTransform sRect = scrollGo.AddComponent<RectTransform>();
+                sRect.anchorMin = new Vector2(0, 0);
+                sRect.anchorMax = new Vector2(1, 1);
+                sRect.offsetMin = new Vector2(25, 90);
+                sRect.offsetMax = new Vector2(-25, -105);
 
-            GameObject vpGo = new GameObject("Viewport");
-            vpGo.transform.SetParent(scrollGo.transform, false);
-            RectTransform vpRect = vpGo.AddComponent<RectTransform>();
-            vpRect.anchorMin = Vector2.zero;
-            vpRect.anchorMax = Vector2.one;
-            vpRect.sizeDelta = new Vector2(-10, -10);
-            vpGo.AddComponent<RectMask2D>();
-            sr.viewport = vpRect;
+                Image sBg = scrollGo.AddComponent<Image>();
+                sBg.color = new Color(0.06f, 0.08f, 0.12f, 0.85f);
+                ScrollRect sr = scrollGo.AddComponent<ScrollRect>();
+                sr.horizontal = true;
+                sr.vertical = false;
 
-            GameObject contGo = new GameObject("ItemContainer");
-            contGo.transform.SetParent(vpGo.transform, false);
-            RectTransform contRect = contGo.AddComponent<RectTransform>();
-            contRect.anchorMin = new Vector2(0, 0);
-            contRect.anchorMax = new Vector2(0, 1);
-            contRect.pivot = new Vector2(0, 0.5f);
+                GameObject vpGo = new GameObject("Viewport");
+                vpGo.transform.SetParent(scrollGo.transform, false);
+                RectTransform vpRect = vpGo.AddComponent<RectTransform>();
+                vpRect.anchorMin = Vector2.zero;
+                vpRect.anchorMax = Vector2.one;
+                vpRect.sizeDelta = new Vector2(-10, -10);
+                vpGo.AddComponent<RectMask2D>();
+                sr.viewport = vpRect;
 
-            HorizontalLayoutGroup hlg = contGo.AddComponent<HorizontalLayoutGroup>();
-            hlg.spacing = 20;
-            hlg.padding = new RectOffset(15, 15, 15, 15);
-            hlg.childControlWidth = false;
-            hlg.childControlHeight = false;
-            hlg.childForceExpandWidth = false;
-            hlg.childForceExpandHeight = false;
-            hlg.childAlignment = TextAnchor.MiddleCenter;
+                GameObject contGo = new GameObject("ItemContainer");
+                contGo.transform.SetParent(vpGo.transform, false);
+                RectTransform contRect = contGo.AddComponent<RectTransform>();
+                contRect.anchorMin = new Vector2(0, 0);
+                contRect.anchorMax = new Vector2(0, 1);
+                contRect.pivot = new Vector2(0, 0.5f);
 
-            ContentSizeFitter csf = contGo.AddComponent<ContentSizeFitter>();
-            csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-            sr.content = contRect;
+                HorizontalLayoutGroup hlg = contGo.AddComponent<HorizontalLayoutGroup>();
+                hlg.spacing = 20;
+                hlg.padding = new RectOffset(15, 15, 15, 15);
+                hlg.childControlWidth = false;
+                hlg.childControlHeight = false;
+                hlg.childForceExpandWidth = false;
+                hlg.childForceExpandHeight = false;
+                hlg.childAlignment = TextAnchor.MiddleCenter;
 
-            // Bottom Player Hand Status
-            GameObject handGo = new GameObject("PlayerHandStatusText");
-            handGo.transform.SetParent(panelObj.transform, false);
-            RectTransform hRect = handGo.AddComponent<RectTransform>();
-            hRect.anchorMin = new Vector2(0, 0);
-            hRect.anchorMax = new Vector2(0.6f, 0);
-            hRect.pivot = new Vector2(0, 0);
-            hRect.anchoredPosition = new Vector2(30, 25);
-            hRect.sizeDelta = new Vector2(0, 45);
-            TextMeshProUGUI hTmp = handGo.AddComponent<TextMeshProUGUI>();
-            hTmp.text = "Tangan Pemain: <i>Kosong</i>";
-            hTmp.fontSize = 18;
-            hTmp.alignment = TextAlignmentOptions.MidlineLeft;
-            hTmp.color = Color.white;
+                ContentSizeFitter csf = contGo.AddComponent<ContentSizeFitter>();
+                csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+                sr.content = contRect;
 
-            // Bottom Deposit Button
-            GameObject depGo = new GameObject("DepositHeldItemButton");
-            depGo.transform.SetParent(panelObj.transform, false);
-            RectTransform dRect = depGo.AddComponent<RectTransform>();
-            dRect.anchorMin = new Vector2(1, 0);
-            dRect.anchorMax = new Vector2(1, 0);
-            dRect.pivot = new Vector2(1, 0);
-            dRect.anchoredPosition = new Vector2(-30, 25);
-            dRect.sizeDelta = new Vector2(240, 45);
-            Image dImg = depGo.AddComponent<Image>();
-            dImg.color = new Color(0.2f, 0.65f, 0.35f, 1f);
-            depGo.AddComponent<Button>();
+                // Bottom Player Hand Status
+                GameObject handGo = new GameObject("PlayerHandStatusText");
+                handGo.transform.SetParent(panelObj.transform, false);
+                RectTransform hRect = handGo.AddComponent<RectTransform>();
+                hRect.anchorMin = new Vector2(0, 0);
+                hRect.anchorMax = new Vector2(0.6f, 0);
+                hRect.pivot = new Vector2(0, 0);
+                hRect.anchoredPosition = new Vector2(30, 25);
+                hRect.sizeDelta = new Vector2(0, 45);
+                TextMeshProUGUI hTmp = handGo.AddComponent<TextMeshProUGUI>();
+                hTmp.text = "Tangan Pemain: <i>Kosong</i>";
+                hTmp.fontSize = 18;
+                hTmp.alignment = TextAlignmentOptions.MidlineLeft;
+                hTmp.color = Color.white;
 
-            GameObject dTxtGo = new GameObject("Text");
-            dTxtGo.transform.SetParent(depGo.transform, false);
-            RectTransform dtRect = dTxtGo.AddComponent<RectTransform>();
-            dtRect.sizeDelta = dRect.sizeDelta;
-            TextMeshProUGUI dtTmp = dTxtGo.AddComponent<TextMeshProUGUI>();
-            dtTmp.text = "Setor Item di Tangan";
-            dtTmp.fontSize = 16;
-            dtTmp.fontStyle = FontStyles.Bold;
-            dtTmp.alignment = TextAlignmentOptions.Center;
-            dtTmp.color = Color.white;
+                // Bottom Deposit Button
+                GameObject depGo = new GameObject("DepositHeldItemButton");
+                depGo.transform.SetParent(panelObj.transform, false);
+                RectTransform dRect = depGo.AddComponent<RectTransform>();
+                dRect.anchorMin = new Vector2(1, 0);
+                dRect.anchorMax = new Vector2(1, 0);
+                dRect.pivot = new Vector2(1, 0);
+                dRect.anchoredPosition = new Vector2(-30, 25);
+                dRect.sizeDelta = new Vector2(240, 45);
+                Image dImg = depGo.AddComponent<Image>();
+                dImg.color = new Color(0.2f, 0.65f, 0.35f, 1f);
+                Button depBtn = depGo.AddComponent<Button>();
 
-            // Feedback Text
-            GameObject feedGo = new GameObject("FeedbackText");
-            feedGo.transform.SetParent(panelObj.transform, false);
-            RectTransform fRect = feedGo.AddComponent<RectTransform>();
-            fRect.anchorMin = new Vector2(0, 0);
-            fRect.anchorMax = new Vector2(1, 0);
-            fRect.pivot = new Vector2(0.5f, 0);
-            fRect.anchoredPosition = new Vector2(0, 72);
-            fRect.sizeDelta = new Vector2(0, 25);
-            TextMeshProUGUI fTmp = feedGo.AddComponent<TextMeshProUGUI>();
-            fTmp.fontSize = 15;
-            fTmp.alignment = TextAlignmentOptions.Center;
-            feedGo.SetActive(false);
+                GameObject dTxtGo = new GameObject("Text");
+                dTxtGo.transform.SetParent(depGo.transform, false);
+                RectTransform dtRect = dTxtGo.AddComponent<RectTransform>();
+                dtRect.sizeDelta = dRect.sizeDelta;
+                TextMeshProUGUI dtTmp = dTxtGo.AddComponent<TextMeshProUGUI>();
+                dtTmp.text = "Setor Item di Tangan";
+                dtTmp.fontSize = 16;
+                dtTmp.fontStyle = FontStyles.Bold;
+                dtTmp.alignment = TextAlignmentOptions.Center;
+                dtTmp.color = Color.white;
 
-            SiloUI ui = panelObj.AddComponent<SiloUI>();
-            ui.AutoDiscoverPanelReferences();
+                // Feedback Text
+                GameObject feedGo = new GameObject("FeedbackText");
+                feedGo.transform.SetParent(panelObj.transform, false);
+                RectTransform fRect = feedGo.AddComponent<RectTransform>();
+                fRect.anchorMin = new Vector2(0, 0);
+                fRect.anchorMax = new Vector2(1, 0);
+                fRect.pivot = new Vector2(0.5f, 0);
+                fRect.anchoredPosition = new Vector2(0, 72);
+                fRect.sizeDelta = new Vector2(0, 25);
+                TextMeshProUGUI fTmp = feedGo.AddComponent<TextMeshProUGUI>();
+                fTmp.fontSize = 15;
+                fTmp.alignment = TextAlignmentOptions.Center;
+                feedGo.SetActive(false);
+
+                // Wire up UI references
+                ui.panelRoot = panelObj;
+                ui.titleText = tTmp;
+                ui.capacityText = cTmp;
+                ui.closeButton = clBtn;
+                ui.itemContainer = contRect;
+                ui.playerHandStatusText = hTmp;
+                ui.depositHeldItemButton = depBtn;
+                ui.feedbackText = fTmp;
+
+                clBtn.onClick.AddListener(ui.CloseUI);
+                depBtn.onClick.AddListener(ui.HandleDepositHeldItemClicked);
+            }
+
+            ui.panelRoot = panelObj;
             panelObj.SetActive(false);
+            ui.FindAndBindSilo();
+            ui.LoadItemDatabaseIfNeeded();
 
+            Debug.Log("<color=cyan>[SiloUI]</color> Runtime Canvas SiloUI berhasil dibuat dan diinisialisasi.");
             return ui;
         }
     }
