@@ -532,6 +532,17 @@ public static class LobbyUIAutoBuilder
             }
         }
 
+        // 7. Ensure Main Camera has PlayerCameraFollow component
+        GameObject mainCam = GameObject.FindWithTag("MainCamera");
+        if (mainCam != null)
+        {
+            var follow = mainCam.GetComponent<CameraSystem.PlayerCameraFollow>();
+            if (follow == null)
+            {
+                mainCam.AddComponent<CameraSystem.PlayerCameraFollow>();
+            }
+        }
+
         // Save SampleScene
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
