@@ -7,6 +7,8 @@ using TMPro;
 using System.Collections.Generic;
 using FishNet.Object;
 using UnityEngine.Tilemaps;
+using SiloSystem;
+using SiloSystem.UI;
 
 public static class LobbyUIAutoBuilder
 {
@@ -557,6 +559,9 @@ public static class LobbyUIAutoBuilder
             }
         }
 
+        // 9. Ensure Canvas and SiloUI exist in scene
+        SetupSiloUIInSampleScene();
+
         // Save SampleScene
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
@@ -568,6 +573,243 @@ public static class LobbyUIAutoBuilder
         EditorSceneManager.OpenScene("Assets/Scenes/Lobby.unity");
 
         Debug.Log("<color=green>[LobbyUIAutoBuilder]</color> SampleScene configured for networked player spawning & Build Settings verified!");
+    }
+
+    private static void SetupSiloUIInSampleScene()
+    {
+        // 1. Ensure EventSystem exists
+        if (Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
+        {
+            GameObject es = new GameObject("EventSystem");
+            es.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            Undo.RegisterCreatedObjectUndo(es, "Create EventSystem");
+        }
+
+        // 2. Ensure Canvas exists
+        Canvas canvas = Object.FindObjectOfType<Canvas>();
+        if (canvas == null)
+        {
+            GameObject canvasGo = new GameObject("Canvas");
+            canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasGo.AddComponent<CanvasScaler>();
+            canvasGo.AddComponent<GraphicRaycaster>();
+            Undo.RegisterCreatedObjectUndo(canvasGo, "Create Canvas");
+        }
+
+        CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
+        if (scaler != null)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+
+        // 3. Ensure SiloUIPanel exists
+        Transform existingPanel = canvas.transform.Find("SiloUIPanel");
+        if (existingPanel != null)
+        {
+            Object.DestroyImmediate(existingPanel.gameObject);
+        }
+
+        TMP_DefaultControls.Resources tmpResources = new TMP_DefaultControls.Resources
+        {
+            standard = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"),
+            background = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd"),
+            inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/InputFieldBackground.psd"),
+            knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"),
+            checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd")
+        };
+
+        // Main Panel Box
+        GameObject panelObj = new GameObject("SiloUIPanel");
+        panelObj.transform.SetParent(canvas.transform, false);
+        RectTransform panelRect = panelObj.AddComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+        panelRect.pivot = new Vector2(0.5f, 0.5f);
+        panelRect.sizeDelta = new Vector2(860, 560);
+
+        Image panelImg = panelObj.AddComponent<Image>();
+        panelImg.sprite = tmpResources.background;
+        panelImg.type = Image.Type.Sliced;
+        panelImg.color = new Color(0.10f, 0.12f, 0.18f, 0.96f);
+
+        // Header Title
+        GameObject titleGo = TMP_DefaultControls.CreateText(tmpResources);
+        titleGo.name = "TitleText";
+        titleGo.transform.SetParent(panelObj.transform, false);
+        RectTransform titleRect = titleGo.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0, 1);
+        titleRect.anchorMax = new Vector2(1, 1);
+        titleRect.pivot = new Vector2(0.5f, 1);
+        titleRect.anchoredPosition = new Vector2(0, -20);
+        titleRect.sizeDelta = new Vector2(0, 40);
+        TextMeshProUGUI titleText = titleGo.GetComponent<TextMeshProUGUI>();
+        titleText.text = "LUMBUNG PANEN (SILO)";
+        titleText.fontSize = 28;
+        titleText.fontStyle = FontStyles.Bold;
+        titleText.alignment = TextAlignmentOptions.Center;
+        titleText.color = Color.white;
+
+        // Capacity Text
+        GameObject capGo = TMP_DefaultControls.CreateText(tmpResources);
+        capGo.name = "CapacityText";
+        capGo.transform.SetParent(panelObj.transform, false);
+        RectTransform capRect = capGo.GetComponent<RectTransform>();
+        capRect.anchorMin = new Vector2(0, 1);
+        capRect.anchorMax = new Vector2(1, 1);
+        capRect.pivot = new Vector2(0.5f, 1);
+        capRect.anchoredPosition = new Vector2(0, -65);
+        capRect.sizeDelta = new Vector2(0, 30);
+        TextMeshProUGUI capText = capGo.GetComponent<TextMeshProUGUI>();
+        capText.text = "Kapasitas: 15 / 999 unit";
+        capText.fontSize = 16;
+        capText.alignment = TextAlignmentOptions.Center;
+        capText.color = new Color(1f, 0.85f, 0.3f, 1f);
+
+        // Close Button [X]
+        GameObject closeBtnGo = TMP_DefaultControls.CreateButton(tmpResources);
+        closeBtnGo.name = "CloseButton";
+        closeBtnGo.transform.SetParent(panelObj.transform, false);
+        RectTransform closeRect = closeBtnGo.GetComponent<RectTransform>();
+        closeRect.anchorMin = new Vector2(1, 1);
+        closeRect.anchorMax = new Vector2(1, 1);
+        closeRect.pivot = new Vector2(1, 1);
+        closeRect.anchoredPosition = new Vector2(-15, -15);
+        closeRect.sizeDelta = new Vector2(40, 40);
+        Image closeImg = closeBtnGo.GetComponent<Image>();
+        closeImg.color = new Color(0.85f, 0.25f, 0.25f, 1f);
+        TextMeshProUGUI closeTxt = closeBtnGo.GetComponentInChildren<TextMeshProUGUI>();
+        if (closeTxt != null) { closeTxt.text = "X"; closeTxt.fontSize = 20; closeTxt.fontStyle = FontStyles.Bold; }
+
+        // Content Area (Scroll View)
+        GameObject scrollGo = new GameObject("ItemScrollView");
+        scrollGo.transform.SetParent(panelObj.transform, false);
+        RectTransform scrollRectTransform = scrollGo.AddComponent<RectTransform>();
+        scrollRectTransform.anchorMin = new Vector2(0, 0);
+        scrollRectTransform.anchorMax = new Vector2(1, 1);
+        scrollRectTransform.pivot = new Vector2(0.5f, 0.5f);
+        scrollRectTransform.offsetMin = new Vector2(25, 90);
+        scrollRectTransform.offsetMax = new Vector2(-25, -105);
+
+        Image scrollBg = scrollGo.AddComponent<Image>();
+        scrollBg.sprite = tmpResources.inputField;
+        scrollBg.type = Image.Type.Sliced;
+        scrollBg.color = new Color(0.06f, 0.08f, 0.12f, 0.85f);
+
+        ScrollRect scrollRect = scrollGo.AddComponent<ScrollRect>();
+        scrollRect.horizontal = true;
+        scrollRect.vertical = false;
+
+        // Viewport
+        GameObject viewportGo = new GameObject("Viewport");
+        viewportGo.transform.SetParent(scrollGo.transform, false);
+        RectTransform vpRect = viewportGo.AddComponent<RectTransform>();
+        vpRect.anchorMin = Vector2.zero;
+        vpRect.anchorMax = Vector2.one;
+        vpRect.sizeDelta = new Vector2(-10, -10);
+        vpRect.anchoredPosition = Vector2.zero;
+        viewportGo.AddComponent<RectMask2D>();
+        scrollRect.viewport = vpRect;
+
+        // Content
+        GameObject contentGo = new GameObject("ItemContainer");
+        contentGo.transform.SetParent(viewportGo.transform, false);
+        RectTransform contentRect = contentGo.AddComponent<RectTransform>();
+        contentRect.anchorMin = new Vector2(0, 0);
+        contentRect.anchorMax = new Vector2(0, 1);
+        contentRect.pivot = new Vector2(0, 0.5f);
+        contentRect.sizeDelta = new Vector2(0, 0);
+
+        HorizontalLayoutGroup hlg = contentGo.AddComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 20;
+        hlg.padding = new RectOffset(15, 15, 15, 15);
+        hlg.childControlWidth = false;
+        hlg.childControlHeight = false;
+        hlg.childForceExpandWidth = false;
+        hlg.childForceExpandHeight = false;
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+
+        ContentSizeFitter csf = contentGo.AddComponent<ContentSizeFitter>();
+        csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        scrollRect.content = contentRect;
+
+        // Bottom Status Bar: Player Hand Status
+        GameObject handGo = TMP_DefaultControls.CreateText(tmpResources);
+        handGo.name = "PlayerHandStatusText";
+        handGo.transform.SetParent(panelObj.transform, false);
+        RectTransform handRect = handGo.GetComponent<RectTransform>();
+        handRect.anchorMin = new Vector2(0, 0);
+        handRect.anchorMax = new Vector2(0.6f, 0);
+        handRect.pivot = new Vector2(0, 0);
+        handRect.anchoredPosition = new Vector2(30, 25);
+        handRect.sizeDelta = new Vector2(0, 45);
+        TextMeshProUGUI handText = handGo.GetComponent<TextMeshProUGUI>();
+        handText.text = "Tangan Pemain: <i>Kosong</i>";
+        handText.fontSize = 18;
+        handText.alignment = TextAlignmentOptions.MidlineLeft;
+        handText.color = Color.white;
+
+        // Bottom Button: Setor Item di Tangan
+        GameObject depositBtnGo = TMP_DefaultControls.CreateButton(tmpResources);
+        depositBtnGo.name = "DepositHeldItemButton";
+        depositBtnGo.transform.SetParent(panelObj.transform, false);
+        RectTransform depRect = depositBtnGo.GetComponent<RectTransform>();
+        depRect.anchorMin = new Vector2(1, 0);
+        depRect.anchorMax = new Vector2(1, 0);
+        depRect.pivot = new Vector2(1, 0);
+        depRect.anchoredPosition = new Vector2(-30, 25);
+        depRect.sizeDelta = new Vector2(240, 45);
+        Image depImg = depositBtnGo.GetComponent<Image>();
+        depImg.color = new Color(0.2f, 0.65f, 0.35f, 1f);
+        TextMeshProUGUI depTxt = depositBtnGo.GetComponentInChildren<TextMeshProUGUI>();
+        if (depTxt != null) { depTxt.text = "Setor Item di Tangan"; depTxt.fontSize = 16; depTxt.fontStyle = FontStyles.Bold; }
+
+        // Feedback Notification Text
+        GameObject feedGo = TMP_DefaultControls.CreateText(tmpResources);
+        feedGo.name = "FeedbackText";
+        feedGo.transform.SetParent(panelObj.transform, false);
+        RectTransform feedRect = feedGo.GetComponent<RectTransform>();
+        feedRect.anchorMin = new Vector2(0, 0);
+        feedRect.anchorMax = new Vector2(1, 0);
+        feedRect.pivot = new Vector2(0.5f, 0);
+        feedRect.anchoredPosition = new Vector2(0, 72);
+        feedRect.sizeDelta = new Vector2(0, 25);
+        TextMeshProUGUI feedText = feedGo.GetComponent<TextMeshProUGUI>();
+        feedText.text = "";
+        feedText.fontSize = 15;
+        feedText.alignment = TextAlignmentOptions.Center;
+        feedGo.SetActive(false);
+
+        // Attach SiloUI component
+        SiloUI siloUI = panelObj.AddComponent<SiloUI>();
+        siloUI.AutoDiscoverPanelReferences();
+
+        // Load Item Database
+        string[] guids = AssetDatabase.FindAssets("t:HarvestItemData", new[] { "Assets/Data/HarvestItems" });
+        SerializedObject so = new SerializedObject(siloUI);
+        SerializedProperty dbProp = so.FindProperty("itemDatabase");
+        if (dbProp != null)
+        {
+            dbProp.ClearArray();
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                HarvestItemData itemData = AssetDatabase.LoadAssetAtPath<HarvestItemData>(path);
+                if (itemData != null)
+                {
+                    dbProp.InsertArrayElementAtIndex(i);
+                    dbProp.GetArrayElementAtIndex(i).objectReferenceValue = itemData;
+                }
+            }
+            so.ApplyModifiedProperties();
+        }
+
+        // Hide panel by default
+        panelObj.SetActive(false);
     }
 
     private static void EnsureScenesInBuildSettings()
