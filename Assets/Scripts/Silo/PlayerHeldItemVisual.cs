@@ -133,11 +133,11 @@ namespace SiloSystem
             }
             else
             {
-                DisplayItem(slot.itemType, slot.quantity);
+                DisplayItem(slot.itemType, slot.quantity, slot.category);
             }
         }
 
-        public void DisplayItem(HarvestType type, int quantity)
+        public void DisplayItem(HarvestType type, int quantity, ItemCategory category = ItemCategory.Crop)
         {
             if (_anchorObj == null) SetupVisualAnchor();
 
@@ -150,22 +150,45 @@ namespace SiloSystem
             {
                 _itemSpriteRenderer.sprite = cropSprite;
 
-                // Jika sprite belum memiliki tekstur spesifik, berikan warna penanda sesuai jenis hasil panen
+                // Jika sprite belum memiliki tekstur spesifik, berikan warna penanda
                 if (cropSprite == null)
                 {
                     _itemSpriteRenderer.sprite = GetDefaultBoxSprite();
-                    _itemSpriteRenderer.color = GetColorForType(type);
+                    _itemSpriteRenderer.color = category == ItemCategory.Seed ? GetSeedColorForType(type) : GetColorForType(type);
                 }
                 else
                 {
-                    _itemSpriteRenderer.color = Color.white;
+                    _itemSpriteRenderer.color = category == ItemCategory.Seed ? new Color(0.8f, 1f, 0.8f, 1f) : Color.white;
                 }
             }
 
             if (_quantityText != null)
             {
-                _quantityText.text = quantity > 1 ? $"x{quantity}" : "";
+                if (category == ItemCategory.Seed)
+                {
+                    _quantityText.text = quantity > 1 ? $"Benih x{quantity}" : "Benih";
+                    _quantityText.color = new Color(0.6f, 1f, 0.6f, 1f); // Hijau segar untuk benih
+                }
+                else
+                {
+                    _quantityText.text = quantity > 1 ? $"x{quantity}" : "";
+                    _quantityText.color = new Color(1f, 0.95f, 0.4f, 1f); // Kuning emas untuk panen
+                }
             }
+        }
+
+        private Color GetSeedColorForType(HarvestType type)
+        {
+            return type switch
+            {
+                HarvestType.Padi => new Color(0.65f, 0.95f, 0.4f, 1f),   // Hijau kecambah padi
+                HarvestType.Jagung => new Color(0.9f, 0.95f, 0.35f, 1f),  // Kuning muda jagung
+                HarvestType.Gandum => new Color(0.9f, 0.85f, 0.55f, 1f),  // Gandum muda
+                HarvestType.Wortel => new Color(0.85f, 0.6f, 0.3f, 1f),   // Biji wortel kecoklatan
+                HarvestType.Tomat => new Color(0.85f, 0.85f, 0.45f, 1f),  // Biji tomat
+                HarvestType.Kentang => new Color(0.75f, 0.65f, 0.45f, 1f), // Umbi bibit
+                _ => new Color(0.6f, 0.95f, 0.5f, 1f)
+            };
         }
 
         public void ClearVisual()

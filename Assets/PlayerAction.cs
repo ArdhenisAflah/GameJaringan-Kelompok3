@@ -82,7 +82,7 @@ public class PlayerAction : NetworkBehaviour
         UpdateGridHighlighter(cellCenter);
 
         // ==========================================
-        // ATURAN BATCH 3: LOCK AKSI SAAT MEMBAWA BARANG
+        // ATURAN BATCH 3 & SEED SYSTEM: LOCK AKSI SAAT MEMBAWA BARANG
         // ==========================================
         bool isCarryingItem = _playerInventory != null && _playerInventory.HasItem;
         if (isCarryingItem)
@@ -94,7 +94,9 @@ public class PlayerAction : NetworkBehaviour
             if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Backslash) || Input.GetKeyDown(KeyCode.RightBracket) ||
                 Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Alpha3))
             {
-                Debug.Log($"<color=orange>[PlayerAction]</color> Tangan sedang membawa '{_playerInventory.HeldType}'! Tidak dapat mencangkul, menyiram, atau mengganti alat. Setor ke Silo terlebih dahulu.");
+                string itemTag = _playerInventory.IsHoldingSeed ? $"{_playerInventory.HeldType} [Benih]" : $"{_playerInventory.HeldType}";
+                string actionHint = _playerInventory.IsHoldingSeed ? "Tanam dengan [E] pada lahan garapan terlebih dahulu." : "Setor ke Silo terlebih dahulu.";
+                Debug.Log($"<color=orange>[PlayerAction]</color> Tangan sedang membawa '{itemTag}'! Tidak dapat mencangkul, menyiram, atau mengganti alat. {actionHint}");
             }
             return;
         }

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using FishNet.Object;
 using Farming.Placement;
+using SiloSystem;
 
 namespace Farming
 {
@@ -53,6 +54,10 @@ namespace Farming
         {
             _playerMovement = GetComponent<PlayerMovement>();
             _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
+            if (GetComponent<PlayerSeedInteractor>() == null)
+            {
+                gameObject.AddComponent<PlayerSeedInteractor>();
+            }
             UpdateStrategy();
         }
 
@@ -75,10 +80,17 @@ namespace Farming
 
             if (Input.GetKeyDown(plantKey) && Time.time >= _lastPlantTime + plantCooldown)
             {
-                // Aturan Batch 3: Jangan izinkan menanam jika tangan sedang membawa hasil panen
-                if (_playerInventory != null && _playerInventory.HasItem)
+                // 1. Tolak jika tangan sedang membawa hasil panen (Crop)
+                if (_playerInventory != null && _playerInventory.IsHoldingCrop)
                 {
-                    Debug.Log($"<color=orange>[PlayerPlanter]</color> Tangan sedang membawa '{_playerInventory.HeldType}'! Tidak dapat menanam benih. Kosongkan tangan atau setor ke Silo terlebih dahulu.");
+                    Debug.Log($"<color=orange>[PlayerPlanter]</color> Tangan sedang membawa hasil panen '{_playerInventory.HeldType}'! Tidak dapat menanam. Kosongkan tangan atau setor ke Silo terlebih dahulu.");
+                    return;
+                }
+
+                // 2. Tolak jika tangan tidak memegang benih (Seed)
+                if (_playerInventory == null || !_playerInventory.IsHoldingSeed)
+                {
+                    Debug.Log("<color=orange>[PlayerPlanter]</color> Tidak ada benih di tangan! Ambil benih dari Source Seed terlebih dahulu (tekan [F] di dekat sumber benih).");
                     return;
                 }
 
@@ -140,12 +152,14 @@ namespace Farming
         [ServerRpc]
         private void ServerPlant(Vector2 targetPosition)
         {
-            // 0. Validasi Tangan Pemain (Server-Authoritative): Cegah menanam jika tangan membawa hasil panen
-            if (_playerInventory != null && _playerInventory.HasItem)
+            // 0. Validasi Tangan Pemain (Server-Authoritative): Wajib memegang benih (Seed)
+            if (_playerInventory == null || !_playerInventory.IsHoldingSeed)
             {
-                Debug.LogWarning("[PlayerPlanter] Ditolak oleh Server: Karakter sedang membawa hasil panen.");
+                Debug.LogWarning("[PlayerPlanter] Ditolak oleh Server: Karakter tidak sedang memegang benih.");
                 return;
             }
+
+            HarvestType plantedSeedType = _playerInventory.HeldType;
 
             // 1. Validasi Prefab
             if (plantPrefab == null)
@@ -221,6 +235,10 @@ namespace Farming
 
             // Spawn ke seluruh jaringan menggunakan FishNet ServerManager
             ServerManager.Spawn(spawnedPlant);
+
+            // 7. Konsumsi 1 benih dari tangan pemain (Server-Authoritative)
+            _playerInventory.ServerConsumeHeldItem(1);
+            Debug.Log($"<color=green>[PlayerPlanter]</color> Pemain {OwnerId} berhasil menanam {plantedSeedType} di {targetPosition}. 1 benih telah dikonsumsi.");
         }
 
         private void OnDrawGizmosSelected()
