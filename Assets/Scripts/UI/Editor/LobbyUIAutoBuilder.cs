@@ -543,6 +543,20 @@ public static class LobbyUIAutoBuilder
             }
         }
 
+        // 8. Ensure Silo prefab instance exists in scene
+        GameObject siloObj = GameObject.Find("Silo");
+        if (siloObj == null)
+        {
+            GameObject siloPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Silo.prefab");
+            if (siloPrefab != null)
+            {
+                siloObj = (GameObject)PrefabUtility.InstantiatePrefab(siloPrefab);
+                siloObj.name = "Silo";
+                siloObj.transform.position = new Vector3(-4.5f, 2f, 0f);
+                Undo.RegisterCreatedObjectUndo(siloObj, "Create Silo Instance");
+            }
+        }
+
         // Save SampleScene
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
