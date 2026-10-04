@@ -10,6 +10,7 @@ public class PlayerAnimation : NetworkBehaviour
     
     private Vector3 _lastPosition;
     private static readonly int IsWalkingHash = Animator.StringToHash("isWalking");
+    private static readonly int IsTanamHash = Animator.StringToHash("isTanam");
 
     // Sinkronisasi arah hadap kiri/kanan saat diam (Idle)
     private readonly SyncVar<bool> _isFacingLeft = new SyncVar<bool>();
@@ -48,6 +49,11 @@ public class PlayerAnimation : NetworkBehaviour
                     ServerSetFacing(facingLeft);
                 }
             }
+
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                TriggerTanamAnimation();
+            }
         }
         else
         {
@@ -68,5 +74,34 @@ public class PlayerAnimation : NetworkBehaviour
     private void ServerSetFacing(bool facingLeft)
     {
         _isFacingLeft.Value = facingLeft;
+    }
+
+    public void TriggerTanamAnimation()
+    {
+        PlayTanam();
+        if (IsClientInitialized)
+        {
+            ServerPlayTanam();
+        }
+    }
+
+    private void PlayTanam()
+    {
+        if (_animator != null && _animator.runtimeAnimatorController != null)
+        {
+            _animator.SetTrigger(IsTanamHash);
+        }
+    }
+
+    [ServerRpc]
+    private void ServerPlayTanam()
+    {
+        ObserversPlayTanam();
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void ObserversPlayTanam()
+    {
+        PlayTanam();
     }
 }
