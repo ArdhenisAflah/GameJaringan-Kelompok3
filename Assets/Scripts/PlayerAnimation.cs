@@ -7,6 +7,7 @@ public class PlayerAnimation : NetworkBehaviour
     private Animator _animator;
     private SpriteRenderer _spriteRenderer;
     private PlayerMovement _movement;
+    private SiloSystem.PlayerInventory _inventory;
     
     private Vector3 _lastPosition;
     private static readonly int IsWalkingHash = Animator.StringToHash("isWalking");
@@ -20,6 +21,7 @@ public class PlayerAnimation : NetworkBehaviour
         _animator = GetComponent<Animator>();
         _spriteRenderer = GetComponent<SpriteRenderer>();
         _movement = GetComponent<PlayerMovement>();
+        _inventory = GetComponent<SiloSystem.PlayerInventory>();
     }
 
     public override void OnStartClient()
@@ -52,7 +54,11 @@ public class PlayerAnimation : NetworkBehaviour
 
             if (Input.GetKeyDown(KeyCode.E))
             {
-                TriggerTanamAnimation();
+                // Jangan picu animasi tanam jika tangan sedang membawa hasil panen
+                if (_inventory == null || !_inventory.HasItem)
+                {
+                    TriggerTanamAnimation();
+                }
             }
         }
         else

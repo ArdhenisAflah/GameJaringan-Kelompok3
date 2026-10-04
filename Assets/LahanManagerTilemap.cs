@@ -213,6 +213,17 @@ public class LahanManagerTilemap : NetworkBehaviour
         petak.tanaman = tanamanObj;
     }
 
+    public GameObject GetTanaman(Vector3 worldPos)
+    {
+        Vector3Int gridPos = WorldToCell(worldPos);
+        return GetTanaman(gridPos);
+    }
+
+    public GameObject GetTanaman(Vector3Int gridPos)
+    {
+        return dataGrid.TryGetValue(gridPos, out InfoPetak p) ? p.tanaman : null;
+    }
+
     public void HapusTanaman(Vector3 worldPos)
     {
         Vector3Int gridPos = WorldToCell(worldPos);

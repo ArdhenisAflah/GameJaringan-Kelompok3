@@ -20,12 +20,14 @@ public class PlayerAction : NetworkBehaviour
     [SerializeField] private Color highlightColorDefault = new Color(1f, 1f, 1f, 0.5f);
 
     private PlayerMovement _playerMovement;
+    private SiloSystem.PlayerInventory _playerInventory;
     private GameObject _gridHighlightObj;
     private LineRenderer _gridLineRenderer;
 
     private void Awake()
     {
         _playerMovement = GetComponent<PlayerMovement>();
+        _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
     }
 
     public override void OnStartClient()
@@ -78,6 +80,24 @@ public class PlayerAction : NetworkBehaviour
         Vector3 targetPos = GetTargetWorldPosition();
         Vector3 cellCenter = GetTargetCellCenter(targetPos);
         UpdateGridHighlighter(cellCenter);
+
+        // ==========================================
+        // ATURAN BATCH 3: LOCK AKSI SAAT MEMBAWA BARANG
+        // ==========================================
+        bool isCarryingItem = _playerInventory != null && _playerInventory.HasItem;
+        if (isCarryingItem)
+        {
+            // Pastikan alat tidak aktif saat membawa barang
+            alatDiTangan = TipeAlat.TanganKosong;
+
+            // Jika pemain mencoba menggunakan alat, berikan peringatan dan batalkan aksi
+            if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Backslash) || Input.GetKeyDown(KeyCode.RightBracket) ||
+                Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Alpha3))
+            {
+                Debug.Log($"<color=orange>[PlayerAction]</color> Tangan sedang membawa '{_playerInventory.HeldType}'! Tidak dapat mencangkul, menyiram, atau mengganti alat. Setor ke Silo terlebih dahulu.");
+            }
+            return;
+        }
 
         // ==========================================
         // 1. BYPASS SHORTCUT (Testing Cepat)
@@ -141,8 +161,66 @@ public class PlayerAction : NetworkBehaviour
                     LahanManagerTilemap.Instance.MintaSiram(targetPos);
                     break;
                 case TipeAlat.TanganKosong:
-                    Debug.Log("[PlayerAction] Tangan kosong! Tekan '2' untuk Cangkul, '3' untuk Alat Siram, atau tombol shortcut '\\' dan ']'.");
+                    // Coba memanen tanaman jika ada tanaman matang di petak depan pemain
+                    if (TryHarvestPlantAt(targetPos))
+                    {
+                        break;
+                    }
+                    Debug.Log("[PlayerAction] Tangan kosong! Tekan '2' untuk Cangkul, '3' untuk Alat Siram, atau dekati tanaman matang untuk memanen.");
                     break;
+            }
+        }
+    }
+
+    private bool TryHarvestPlantAt(Vector3 targetPos)
+    {
+        // 1. Cek via Physics2D Overlap di area petak depan
+        Collider2D[] hits = Physics2D.OverlapCircleAll(targetPos, 0.45f);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Farming.Plant plant = hits[i].GetComponentInParent<Farming.Plant>();
+            if (plant != null && plant.IsMature)
+            {
+                Debug.Log($"[PlayerAction] Memanen tanaman matang '{plant.PlantName}'...");
+                ServerRequestHarvest(plant.GetComponent<NetworkObject>());
+                return true;
+            }
+        }
+
+        // 2. Fallback cek via LahanManagerTilemap jika collider tanaman belum aktif
+        if (LahanManagerTilemap.Instance != null)
+        {
+            GameObject plantObj = LahanManagerTilemap.Instance.GetTanaman(targetPos);
+            if (plantObj != null)
+            {
+                Farming.Plant plant = plantObj.GetComponent<Farming.Plant>();
+                if (plant != null && plant.IsMature)
+                {
+                    Debug.Log($"[PlayerAction] Memanen tanaman matang '{plant.PlantName}' via LahanManager...");
+                    ServerRequestHarvest(plant.GetComponent<NetworkObject>());
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    [ServerRpc]
+    private void ServerRequestHarvest(NetworkObject plantNob)
+    {
+        if (plantNob == null) return;
+        Farming.Plant plant = plantNob.GetComponent<Farming.Plant>();
+        if (plant != null && plant.IsMature)
+        {
+            float dist = Vector2.Distance(transform.position, plant.transform.position);
+            if (dist <= reachDistance + 1.2f)
+            {
+                plant.ServerHarvest(GetComponent<NetworkObject>());
+            }
+            else
+            {
+                Debug.LogWarning($"[PlayerAction] Permintaan panen ditolak: Jarak terlalu jauh ({dist:F2} unit).");
             }
         }
     }

@@ -46,11 +46,13 @@ namespace Farming
         private static readonly Dictionary<Vector2Int, GameObject> _fallbackOccupiedCells = new Dictionary<Vector2Int, GameObject>();
 
         private PlayerMovement _playerMovement;
+        private SiloSystem.PlayerInventory _playerInventory;
         private IPlacementStrategy _placementStrategy;
 
         private void Awake()
         {
             _playerMovement = GetComponent<PlayerMovement>();
+            _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
             UpdateStrategy();
         }
 
@@ -73,6 +75,13 @@ namespace Farming
 
             if (Input.GetKeyDown(plantKey) && Time.time >= _lastPlantTime + plantCooldown)
             {
+                // Aturan Batch 3: Jangan izinkan menanam jika tangan sedang membawa hasil panen
+                if (_playerInventory != null && _playerInventory.HasItem)
+                {
+                    Debug.Log($"<color=orange>[PlayerPlanter]</color> Tangan sedang membawa '{_playerInventory.HeldType}'! Tidak dapat menanam benih. Kosongkan tangan atau setor ke Silo terlebih dahulu.");
+                    return;
+                }
+
                 _lastPlantTime = Time.time;
                 RequestPlantAction();
             }
@@ -131,6 +140,13 @@ namespace Farming
         [ServerRpc]
         private void ServerPlant(Vector2 targetPosition)
         {
+            // 0. Validasi Tangan Pemain (Server-Authoritative): Cegah menanam jika tangan membawa hasil panen
+            if (_playerInventory != null && _playerInventory.HasItem)
+            {
+                Debug.LogWarning("[PlayerPlanter] Ditolak oleh Server: Karakter sedang membawa hasil panen.");
+                return;
+            }
+
             // 1. Validasi Prefab
             if (plantPrefab == null)
             {
