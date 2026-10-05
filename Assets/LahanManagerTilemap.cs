@@ -15,6 +15,12 @@ public class LahanManagerTilemap : NetworkBehaviour
 {
     public static LahanManagerTilemap Instance { get; private set; }
 
+    [Header("Pengaturan Area Bertani (Manual Map)")]
+    [Tooltip("Layer Tilemap tempat kamu menggambar rumput secara manual (Order in Layer -1)")]
+    public Tilemap tilemapRumput;
+    [Tooltip("Aset Tile Rumput yang diizinkan untuk dicangkul")]
+    public TileBase tileRumput;
+
     [Header("Pengaturan Tilemap")]
     [Tooltip("Layer Tilemap khusus untuk tanah kering (Order in Layer 0 / Sorting Layer Tanah)")]
     public Tilemap tilemapTanah;
@@ -40,6 +46,11 @@ public class LahanManagerTilemap : NetworkBehaviour
         Instance = this;
 
         // Auto-discovery Tilemap jika belum terpasang di Inspector
+        if (tilemapRumput == null)
+        {
+            GameObject go = GameObject.Find("TilemapRumput");
+            if (go != null) tilemapRumput = go.GetComponent<Tilemap>();
+        }
         if (tilemapTanah == null)
         {
             GameObject go = GameObject.Find("TilemapTanah");
@@ -248,6 +259,18 @@ public class LahanManagerTilemap : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void Server_ProsesCangkul(Vector3Int gridPos)
     {
+        // 1. VALIDASI: Cek apakah titik ini adalah rumput yang boleh dicangkul
+        if (tilemapRumput != null && tileRumput != null)
+        {
+            TileBase tileDiSini = tilemapRumput.GetTile(gridPos);
+            if (tileDiSini != tileRumput)
+            {
+                // Batal mencangkul karena ini bukan area TileRumput
+                return;
+            }
+        }
+
+        // 2. Lanjutkan proses jika valid
         if (!dataGrid.ContainsKey(gridPos))
         {
             InfoPetak petakBaru = new InfoPetak

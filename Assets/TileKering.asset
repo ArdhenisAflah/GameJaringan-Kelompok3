@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d1514134bc4fbd41bb739b1b9a49231, type: 3}
   m_Name: TileKering
   m_EditorClassIdentifier: 
-  m_DefaultSprite: {fileID: -1367345890, guid: 249d81ab25e6b46278c56624fb49fa46, type: 3}
+  m_DefaultSprite: {fileID: 1012043, guid: 5382676564f0841bea77e2da8e51ee0d, type: 3}
   m_DefaultGameObject: {fileID: 0}
   m_DefaultColliderType: 1
   m_TilingRules: []

@@ -105,6 +105,8 @@ MonoBehaviour:
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 6951573975057506569}
   _networkObjectCache: {fileID: 0}
+  tilemapRumput: {fileID: 0}
+  tileRumput: {fileID: 11400000, guid: 6c23fdbe4e0f94e12a160d9b1d4a25fe, type: 2}
   tilemapTanah: {fileID: 0}
   tilemapBasah: {fileID: 0}
   tilemapLahan: {fileID: 0}
