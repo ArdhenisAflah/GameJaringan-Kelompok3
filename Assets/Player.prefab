@@ -24,6 +24,7 @@ GameObject:
   - component: {fileID: 1140000000000000009}
   - component: {fileID: 1140000000000000010}
   - component: {fileID: 1140000000000000011}
+  - component: {fileID: 1303585721589607492}
   m_Layer: 8
   m_Name: Player
   m_TagString: Untagged
@@ -128,7 +129,7 @@ MonoBehaviour:
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 1
+  <PrefabId>k__BackingField: 2
   <SpawnableCollectionId>k__BackingField: 0
   <AssetPathHash>k__BackingField: 3127767274982672596
   SceneId: 0
@@ -147,6 +148,10 @@ MonoBehaviour:
   - {fileID: 3352812888455781273}
   - {fileID: -6968156275157675207}
   - {fileID: -6026541863412064557}
+  - {fileID: -4687261658800787761}
+  - {fileID: 4584013604512825916}
+  - {fileID: 6311243859730080079}
+  - {fileID: 1729482910482918273}
   - {fileID: 1140000000000000009}
   - {fileID: 1140000000000000011}
   InitializedParentNetworkBehaviour: {fileID: 0}
@@ -159,7 +164,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584116885534401878
+  _initializedTimestamp: -8584103984464104948
 --- !u!114 &3352812888455781273
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -276,9 +281,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ea44ef649d1927341929f1f6e13327a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 3
   _addedNetworkObject: {fileID: 4326351770396735908}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 4326351770396735908}
   plantKey: 101
   placementType: 0
   reachDistance: 1
@@ -301,9 +306,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6912b956fd6714ad4be956d4e36ef0b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 4
   _addedNetworkObject: {fileID: 4326351770396735908}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 4326351770396735908}
   alatDiTangan: 0
   reachDistance: 1
   showGridHighlight: 1
@@ -343,9 +348,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a992cbd54ade9b4a5a46869ecc3850ec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 5
   _addedNetworkObject: {fileID: 4326351770396735908}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 4326351770396735908}
 --- !u!114 &1729482910482918273
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -358,9 +363,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ebadfcd67f09c43948e66360571daa72, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 6
   _addedNetworkObject: {fileID: 4326351770396735908}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 4326351770396735908}
 --- !u!58 &5800000000000000001
 CircleCollider2D:
   m_ObjectHideFlags: 0
@@ -408,9 +413,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bcc9c86fa76f465db91e07564d369049, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 7
   _addedNetworkObject: {fileID: 4326351770396735908}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 4326351770396735908}
 --- !u!114 &1140000000000000010
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -428,6 +433,7 @@ MonoBehaviour:
   hoverAmplitude: 0.05
   hoverFrequency: 4
   playerInventory: {fileID: 1140000000000000009}
+  itemDatabase: []
 --- !u!114 &1140000000000000011
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -440,12 +446,36 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d649a8552a943818860033cab141271, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 8
   _addedNetworkObject: {fileID: 4326351770396735908}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 4326351770396735908}
   quickDepositKey: 102
   interactionDistance: 2.5
   playerInventory: {fileID: 1140000000000000009}
-
-
-
+--- !u!114 &1303585721589607492
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3105670873629239247}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0bf5f213b5f4323835209b59486b322, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 4326351770396735908}
+  _networkObjectCache: {fileID: 0}
+  arrowSprite: {fileID: 21300000, guid: 3d288815ce930014fbe9c5154c0b57ce, type: 3}
+  normalHeadOffset: {x: 0, y: 0.68, z: 0}
+  heldItemHeadOffset: {x: 0, y: 1.55, z: 0}
+  arrowScale: {x: 0.5, y: 0.5, z: 1}
+  heightLerpSpeed: 10
+  sortingLayerName: Karakter
+  sortingOrder: 30
+  enableBobbing: 1
+  bobAmplitude: 0.05
+  bobFrequency: 4
+  testShowInEditor: 1
+  playerInventory: {fileID: 1140000000000000009}
