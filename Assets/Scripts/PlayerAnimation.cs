@@ -54,8 +54,8 @@ public class PlayerAnimation : NetworkBehaviour
 
             if (Input.GetKeyDown(KeyCode.E))
             {
-                // Jangan picu animasi tanam jika tangan sedang membawa hasil panen
-                if (_inventory == null || !_inventory.HasItem)
+                // Jangan picu animasi tanam jika tangan sedang membawa hasil panen (bukan benih)
+                if (_inventory == null || !_inventory.IsHoldingCrop)
                 {
                     TriggerTanamAnimation();
                 }
