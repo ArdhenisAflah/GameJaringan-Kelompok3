@@ -28,6 +28,10 @@ namespace PlayerVisual
         private int _pickTriggerHash;
         private bool _wasHolding;
 
+        private bool _hasHoldingParam;
+        private bool _hasPickParam;
+        private bool _hasValidatedParams;
+
         private void Awake()
         {
             _animator = GetComponent<Animator>();
@@ -35,17 +39,63 @@ namespace PlayerVisual
 
             _isHoldingHash = Animator.StringToHash(isHoldingParameter);
             _pickTriggerHash = Animator.StringToHash(pickTriggerParameter);
+
+            ValidateAnimatorParameters();
+        }
+
+        /// <summary>
+        /// Memvalidasi apakah parameter yang dikonfigurasi benar-benar ada pada Animator Controller.
+        /// Mencegah UnityException ("Parameter 'Hash ...' does not exist") yang menyebabkan spam error.
+        /// </summary>
+        private void ValidateAnimatorParameters()
+        {
+            _hasHoldingParam = false;
+            _hasPickParam = false;
+
+            if (_animator == null || _animator.runtimeAnimatorController == null) return;
+
+            foreach (AnimatorControllerParameter param in _animator.parameters)
+            {
+                if (param.nameHash == _isHoldingHash && param.type == AnimatorControllerParameterType.Bool)
+                {
+                    _hasHoldingParam = true;
+                }
+                else if (param.nameHash == _pickTriggerHash && param.type == AnimatorControllerParameterType.Trigger)
+                {
+                    _hasPickParam = true;
+                }
+            }
+
+            if (!_hasValidatedParams)
+            {
+                if (!_hasHoldingParam)
+                {
+                    Debug.LogWarning($"[PlayerPickupAnimation] Parameter bool '{isHoldingParameter}' (hash {_isHoldingHash}) tidak ditemukan pada Animator Controller '{_animator.runtimeAnimatorController.name}'. Transisi animasi bawa barang diabaikan sampai parameter ditambahkan ke Animator.", this);
+                }
+
+                if (!_hasPickParam)
+                {
+                    Debug.LogWarning($"[PlayerPickupAnimation] Parameter trigger '{pickTriggerParameter}' (hash {_pickTriggerHash}) tidak ditemukan pada Animator Controller '{_animator.runtimeAnimatorController.name}'. Animasi pick diabaikan sampai parameter ditambahkan ke Animator.", this);
+                }
+
+                _hasValidatedParams = true;
+            }
         }
 
         private void Start()
         {
+            if (_animator != null && _animator.runtimeAnimatorController != null && (!_hasHoldingParam || !_hasPickParam))
+            {
+                ValidateAnimatorParameters();
+            }
+
             if (_inventory != null)
             {
                 _inventory.OnHeldItemChanged += HandleHeldItemChanged;
 
                 // Evaluasi status awal (misal saat join ke room atau spawn)
                 _wasHolding = _inventory.HasItem;
-                if (_animator != null && _animator.runtimeAnimatorController != null)
+                if (_hasHoldingParam && _animator != null && _animator.runtimeAnimatorController != null)
                 {
                     _animator.SetBool(_isHoldingHash, _wasHolding);
                 }
@@ -69,10 +119,13 @@ namespace PlayerVisual
 
             if (_animator != null && _animator.runtimeAnimatorController != null)
             {
-                _animator.SetBool(_isHoldingHash, isHoldingNow);
+                if (_hasHoldingParam)
+                {
+                    _animator.SetBool(_isHoldingHash, isHoldingNow);
+                }
 
                 // Jika sebelumnya tangan kosong dan sekarang memegang item -> picu animasi pick
-                if (!_wasHolding && isHoldingNow)
+                if (_hasPickParam && !_wasHolding && isHoldingNow)
                 {
                     _animator.ResetTrigger(_pickTriggerHash);
                     _animator.SetTrigger(_pickTriggerHash);
@@ -87,7 +140,7 @@ namespace PlayerVisual
         /// </summary>
         private void Update()
         {
-            if (_animator == null || _inventory == null || _animator.runtimeAnimatorController == null) return;
+            if (!_hasHoldingParam || _animator == null || _inventory == null || _animator.runtimeAnimatorController == null) return;
 
             bool isHolding = _inventory.HasItem;
             if (_animator.GetBool(_isHoldingHash) != isHolding)
@@ -102,7 +155,7 @@ namespace PlayerVisual
         /// </summary>
         public void TriggerPick()
         {
-            if (_animator != null && _animator.runtimeAnimatorController != null)
+            if (_hasPickParam && _animator != null && _animator.runtimeAnimatorController != null)
             {
                 _animator.SetTrigger(_pickTriggerHash);
             }
