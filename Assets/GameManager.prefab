@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 5775955541213248373}
   - component: {fileID: 6951573975057506569}
   - component: {fileID: 4322120183578561019}
+  - component: {fileID: 4322120183578561020}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -51,7 +52,8 @@ MonoBehaviour:
   <ComponentIndex>k__BackingField: 0
   <PredictedSpawn>k__BackingField: {fileID: 0}
   <PredictedOwner>k__BackingField: {fileID: 0}
-  NetworkBehaviours: []
+  NetworkBehaviours:
+  - {fileID: 4322120183578561020}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -110,3 +112,23 @@ MonoBehaviour:
   tilemapLahan: {fileID: 0}
   tileKering: {fileID: 11400000, guid: 8edc6641d36534833add5050c415ae8b, type: 2}
   tileBasah: {fileID: 11400000, guid: e75937020a6454f108398be0a32e3f59, type: 2}
+--- !u!114 &4322120183578561020
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7231824710015417537}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2c3d4e5f60718293a4b5c6d7e8f90a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 0
+  _addedNetworkObject: {fileID: 6951573975057506569}
+  _networkObjectCache: {fileID: 6951573975057506569}
+  maxFailedOrders: 3
+  shutdownDelay: 5
+  lobbySceneName: Lobby
+  enableWinCondition: 0
+  targetCompletedOrders: 10
