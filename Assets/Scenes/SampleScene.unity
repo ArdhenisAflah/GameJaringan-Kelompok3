@@ -1040,6 +1040,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 4322120183578561020, guid: 7dad3b02781f64d8ab9d7ec66ac3bfd3, type: 3}
+      propertyPath: maxFailedOrders
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5775955541213248373, guid: 7dad3b02781f64d8ab9d7ec66ac3bfd3, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
