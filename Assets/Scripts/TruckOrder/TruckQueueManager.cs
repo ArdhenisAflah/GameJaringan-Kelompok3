@@ -325,8 +325,16 @@ namespace TruckOrder
             // 1. Pastikan OrderSystem ada
             if (OrderSystem.Instance == null && FindObjectOfType<OrderSystem>() == null)
             {
-                GameObject osObj = new GameObject("OrderSystem");
-                osObj.AddComponent<OrderSystem>();
+                GameObject gm = GameObject.Find("GameManager");
+                if (gm != null)
+                {
+                    gm.AddComponent<OrderSystem>();
+                }
+                else
+                {
+                    GameObject osObj = new GameObject("OrderSystem");
+                    osObj.AddComponent<OrderSystem>();
+                }
                 Debug.Log("<color=green>[TruckOrder]</color> Auto-created OrderSystem in SampleScene.");
             }
 

@@ -46,6 +46,22 @@ namespace TruckOrder
         }
 
         /// <summary>
+        /// Mengatur kuantitas yang telah dimasukkan secara langsung (sinkronisasi network).
+        /// </summary>
+        public void SetCurrentAmount(int amount)
+        {
+            currentAmount = Mathf.Clamp(amount, 0, requiredAmount);
+        }
+
+        /// <summary>
+        /// Mengatur kuantitas kebutuhan order secara langsung (sinkronisasi network).
+        /// </summary>
+        public void SetRequiredAmount(int amount)
+        {
+            requiredAmount = Mathf.Max(1, amount);
+        }
+
+        /// <summary>
         /// Mengatur status order (hanya dipanggil oleh OrderSystem).
         /// </summary>
         public void SetStatus(OrderStatus newStatus)

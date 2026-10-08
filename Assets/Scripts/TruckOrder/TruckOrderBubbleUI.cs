@@ -164,9 +164,9 @@ namespace TruckOrder
             {
                 UpdatePanelScreenPosition();
 
-                if (_orderSystem != null && _orderSystem.ActiveTruck != null)
+                if (_orderSystem != null && _orderSystem.HasActiveOrder)
                 {
-                    float remaining = _orderSystem.ActiveTruck.RemainingPatienceTime;
+                    float remaining = _orderSystem.RemainingPatienceTime;
                     UpdateTimerDisplay(remaining);
                 }
             }

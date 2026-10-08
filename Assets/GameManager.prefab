@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 6951573975057506569}
   - component: {fileID: 4322120183578561019}
   - component: {fileID: 4322120183578561020}
+  - component: {fileID: 4322120183578561021}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -54,6 +55,7 @@ MonoBehaviour:
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
   - {fileID: 4322120183578561020}
+  - {fileID: 4322120183578561021}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -132,3 +134,20 @@ MonoBehaviour:
   lobbySceneName: Lobby
   enableWinCondition: 0
   targetCompletedOrders: 10
+--- !u!114 &4322120183578561021
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7231824710015417537}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 715c2fae530e46e19aaa1002ca3642b5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 1
+  _addedNetworkObject: {fileID: 6951573975057506569}
+  _networkObjectCache: {fileID: 6951573975057506569}
+  moneyManagerComponent: {fileID: 0}
+  defaultRewardPerUnit: 10

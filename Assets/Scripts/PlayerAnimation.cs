@@ -15,6 +15,8 @@ public class PlayerAnimation : NetworkBehaviour
 
     // Sinkronisasi arah hadap kiri/kanan saat diam (Idle)
     private readonly SyncVar<bool> _isFacingLeft = new SyncVar<bool>();
+    // Sinkronisasi status berjalan (Walk) antar semua pemain di jaringan
+    private readonly SyncVar<bool> _isWalking = new SyncVar<bool>();
 
     private void Awake()
     {
@@ -28,21 +30,35 @@ public class PlayerAnimation : NetworkBehaviour
     {
         base.OnStartClient();
         _lastPosition = transform.position;
+
         // Listen perubahan flip saat pemain lain membalik badan
         _isFacingLeft.OnChange += (prev, next, asServer) => _spriteRenderer.flipX = next;
+
+        // Listen perubahan status jalan pemain lain untuk animasi mulus bebas flicker
+        _isWalking.OnChange += (prev, next, asServer) =>
+        {
+            if (!IsOwner && _animator != null && _animator.runtimeAnimatorController != null)
+            {
+                _animator.SetBool(IsWalkingHash, next);
+            }
+        };
+
+        // Inisialisasi awal saat client join ke room yang sedang berjalan
+        _spriteRenderer.flipX = _isFacingLeft.Value;
+        if (!IsOwner && _animator != null && _animator.runtimeAnimatorController != null)
+        {
+            _animator.SetBool(IsWalkingHash, _isWalking.Value);
+        }
     }
 
     private void Update()
     {
-        bool isMoving;
-
         if (IsOwner)
         {
             // Owner membaca input pergerakan
-            Vector2 dir = _movement != null ? _movement.FacingDirection : Vector2.zero;
-            isMoving = _movement.IsMoving;
+            bool isMoving = _movement != null && _movement.IsMoving;
 
-            if (_movement.FacingDirection.x != 0)
+            if (_movement != null && _movement.FacingDirection.x != 0)
             {
                 bool facingLeft = _movement.FacingDirection.x < 0;
                 _spriteRenderer.flipX = facingLeft;
@@ -50,6 +66,16 @@ public class PlayerAnimation : NetworkBehaviour
                 {
                     ServerSetFacing(facingLeft);
                 }
+            }
+
+            if (_isWalking.Value != isMoving)
+            {
+                ServerSetWalking(isMoving);
+            }
+
+            if (_animator != null && _animator.runtimeAnimatorController != null)
+            {
+                _animator.SetBool(IsWalkingHash, isMoving);
             }
 
             if (Input.GetKeyDown(KeyCode.E))
@@ -63,16 +89,12 @@ public class PlayerAnimation : NetworkBehaviour
         }
         else
         {
-            // Non-Owner mendeteksi gerakan dari perpindahan NetworkTransform
-            float speed = (transform.position - _lastPosition).magnitude / Mathf.Max(Time.deltaTime, 0.001f);
-            isMoving = speed > 0.05f;
+            // Non-Owner mengandalkan SyncVar yang presisi dari jaringan (tanpa kalkulasi delta position yang jittery)
             _spriteRenderer.flipX = _isFacingLeft.Value;
-        }
-
-        _lastPosition = transform.position;
-        if (_animator != null && _animator.runtimeAnimatorController != null)
-        {
-            _animator.SetBool(IsWalkingHash, isMoving);
+            if (_animator != null && _animator.runtimeAnimatorController != null)
+            {
+                _animator.SetBool(IsWalkingHash, _isWalking.Value);
+            }
         }
     }
 
@@ -80,6 +102,12 @@ public class PlayerAnimation : NetworkBehaviour
     private void ServerSetFacing(bool facingLeft)
     {
         _isFacingLeft.Value = facingLeft;
+    }
+
+    [ServerRpc]
+    private void ServerSetWalking(bool isWalking)
+    {
+        _isWalking.Value = isWalking;
     }
 
     public void TriggerTanamAnimation()

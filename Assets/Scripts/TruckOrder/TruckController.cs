@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using FishNet;
 using SiloSystem;
 
 namespace TruckOrder
@@ -82,7 +83,6 @@ namespace TruckOrder
             }
 
             ApplySortingSettings();
-            GenerateOrder();
         }
 
         private void Start()
@@ -186,28 +186,38 @@ namespace TruckOrder
             TotalPatienceTime = (testSecondsOverride > 0f) ? testSecondsOverride : (patienceMinutes * 60f);
             RemainingPatienceTime = TotalPatienceTime;
 
-            // Aktifkan pesanan ke OrderSystem
-            if (OrderSystem.Instance != null)
+            // Server-Authoritative: Hanya Server atau mode offline yang mengaktifkan order baru
+            bool isServer = InstanceFinder.IsServerStarted;
+            bool isOffline = !InstanceFinder.IsServerStarted && !InstanceFinder.IsClientStarted;
+
+            if (isServer || isOffline)
             {
-                OrderSystem.Instance.ActivateOrder(MyOrder, this);
+                int randomQty = UnityEngine.Random.Range(minAmount, maxAmount + 1);
+                MyOrder = new Order(orderItemType, randomQty, rewardPerUnit);
+
+                if (OrderSystem.Instance != null)
+                {
+                    OrderSystem.Instance.ServerActivateNewOrder(orderItemType, randomQty, TotalPatienceTime, rewardPerUnit, this);
+                }
             }
         }
 
         private void HandlePatienceTimer()
         {
-            RemainingPatienceTime -= Time.deltaTime;
-            OnTimerTick?.Invoke(RemainingPatienceTime, TotalPatienceTime);
-
-            if (RemainingPatienceTime <= 0f)
+            if (OrderSystem.Instance != null && OrderSystem.Instance.HasActiveOrder)
             {
-                RemainingPatienceTime = 0f;
-                // Waktu habis, order gagal
-                if (OrderSystem.Instance != null && OrderSystem.Instance.HasActiveOrder)
+                RemainingPatienceTime = OrderSystem.Instance.RemainingPatienceTime;
+                TotalPatienceTime = OrderSystem.Instance.TotalPatienceTime;
+                OnTimerTick?.Invoke(RemainingPatienceTime, TotalPatienceTime);
+            }
+            else
+            {
+                RemainingPatienceTime -= Time.deltaTime;
+                OnTimerTick?.Invoke(RemainingPatienceTime, TotalPatienceTime);
+
+                if (RemainingPatienceTime <= 0f)
                 {
-                    OrderSystem.Instance.FailActiveOrder();
-                }
-                else
-                {
+                    RemainingPatienceTime = 0f;
                     NotifyOrderFailed();
                 }
             }

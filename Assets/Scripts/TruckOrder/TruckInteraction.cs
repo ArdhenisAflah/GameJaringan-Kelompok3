@@ -120,14 +120,18 @@ namespace TruckOrder
         {
             if (_promptText == null) return;
 
-            if (player != null && player.HasItem && player.HeldType == HarvestType.Padi && player.IsHoldingCrop)
+            HarvestType neededType = (OrderSystem.Instance != null && OrderSystem.Instance.ActiveOrder != null)
+                ? OrderSystem.Instance.ActiveOrder.ItemType
+                : HarvestType.Padi;
+
+            if (player != null && player.HasItem && player.HeldType == neededType && player.IsHoldingCrop)
             {
-                _promptText.text = $"[{interactKey}] Masukkan Padi ({player.HeldQuantity} di tangan)";
+                _promptText.text = $"[{interactKey}] Masukkan {neededType} ({player.HeldQuantity} di tangan)";
                 _promptText.color = new Color(0.6f, 1f, 0.5f, 1f); // Hijau siap setor
             }
             else
             {
-                _promptText.text = "Bawa Padi ke Truk";
+                _promptText.text = $"Bawa {neededType} ke Truk";
                 _promptText.color = new Color(1f, 0.75f, 0.3f, 1f); // Oranye peringatan
             }
         }
