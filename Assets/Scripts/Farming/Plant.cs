@@ -1,6 +1,7 @@
 using UnityEngine;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
+using SiloSystem;
 
 namespace Farming
 {
@@ -14,7 +15,13 @@ namespace Farming
     {
         [Header("Pengaturan Tanaman")]
         [Tooltip("Nama jenis tanaman.")]
-        [SerializeField] private string plantName = "Default Plant";
+        [SerializeField] private string plantName = "Padi";
+
+        [Tooltip("Jenis hasil panen yang dihasilkan tanaman ini.")]
+        [SerializeField] private HarvestType cropType = HarvestType.Padi;
+
+        [Tooltip("Jumlah hasil panen yang diperoleh per panen.")]
+        [SerializeField] private int harvestYield = 1;
 
         [Tooltip("Jumlah tahap pertumbuhan maksimal sampai siap panen.")]
         [SerializeField] private int maxGrowthStage = 3;
@@ -35,8 +42,44 @@ namespace Farming
         private float _growthTimer;
 
         public string PlantName => plantName;
+        public HarvestType CropType => cropType;
+        public int HarvestYield => harvestYield;
         public int GrowthStage => _growthStage.Value;
         public bool IsMature => _growthStage.Value >= maxGrowthStage;
+
+        /// <summary>
+        /// Mengeksekusi pemanenan tanaman oleh pemain di Server (Server-Authoritative).
+        /// Memasukkan hasil panen ke PlayerInventory jika tangan pemain kosong atau bertipe sama.
+        /// </summary>
+        public bool ServerHarvest(NetworkObject playerNob)
+        {
+            if (!IsServerStarted) return false;
+            if (!IsMature) return false;
+            if (playerNob == null) return false;
+
+            PlayerInventory inv = playerNob.GetComponent<PlayerInventory>();
+            if (inv == null) return false;
+
+            // Aturan Batch 2: Pemain hanya bisa memegang 1 jenis item dalam satu waktu
+            if (inv.HasItem && inv.HeldType != cropType)
+            {
+                Debug.Log($"[Plant] Pemain {playerNob.OwnerId} sedang membawa {inv.HeldType}, tidak dapat memanen {cropType}.");
+                return false;
+            }
+
+            int newQty = inv.HasItem ? inv.HeldQuantity + harvestYield : harvestYield;
+            bool success = inv.ServerSetHeldItem(cropType, newQty);
+            if (success)
+            {
+                Debug.Log($"<color=green>[Plant]</color> Tanaman '{plantName}' berhasil dipanen oleh Pemain {playerNob.OwnerId}! Menambahkan {cropType} x{harvestYield}.");
+
+                // Despawn tanaman resmi dari server FishNet
+                ServerManager.Despawn(gameObject);
+                return true;
+            }
+
+            return false;
+        }
 
         private void Awake()
         {
