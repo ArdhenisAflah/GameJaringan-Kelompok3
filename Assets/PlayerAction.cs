@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using FishNet.Object;
 
 public class PlayerAction : NetworkBehaviour
@@ -9,32 +10,36 @@ public class PlayerAction : NetworkBehaviour
     public TipeAlat alatDiTangan = TipeAlat.TanganKosong;
 
     [Header("Jangkauan Aksi")]
-    [Tooltip("Jarak petak di depan pemain yang ditargetkan.")]
+    [Tooltip("Jarak petak jangkauan aksi pemain.")]
     [SerializeField] private float reachDistance = 1.0f;
 
-    [Header("Visual Grid Highlight")]
-    [Tooltip("Menampilkan kotak highlight target di Game View.")]
+    [Header("Visual Spritesheet Selector")]
+    [Tooltip("Menampilkan animasi spritesheet grid selector di Game View.")]
     [SerializeField] private bool showGridHighlight = true;
-    [SerializeField] private Color highlightColorCangkul = new Color(1f, 0.85f, 0.2f, 0.85f);
-    [SerializeField] private Color highlightColorSiram = new Color(0.2f, 0.75f, 1f, 0.85f);
-    [SerializeField] private Color highlightColorDefault = new Color(1f, 1f, 1f, 0.5f);
+    [Tooltip("Daftar frame animasi opsional jika diisi manual via Inspector (default auto-load dari Placement Area.png).")]
+    [SerializeField] private Sprite[] selectorFrames;
 
     private PlayerMovement _playerMovement;
     private SiloSystem.PlayerInventory _playerInventory;
-    private GameObject _gridHighlightObj;
-    private LineRenderer _gridLineRenderer;
+    private Farming.PlayerPlanter _playerPlanter;
+
+    private GameObject _tileIndicatorObj;
+    private TilePlacementIndicator _tileIndicator;
+
+    public TilePlacementIndicator TileIndicator => _tileIndicator;
 
     private void Awake()
     {
         _playerMovement = GetComponent<PlayerMovement>();
         _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
+        _playerPlanter = GetComponent<Farming.PlayerPlanter>();
     }
 
     public override void OnStartClient()
     {
         base.OnStartClient();
 
-        // Hanya buat in-game highlight pada client pemilik karakter
+        // Hanya inisialisasi indikator pada client lokal pemilik karakter (IsOwner)
         if (IsOwner && showGridHighlight)
         {
             SetupGridHighlighter();
@@ -43,138 +48,181 @@ public class PlayerAction : NetworkBehaviour
 
     private void OnDestroy()
     {
-        if (_gridHighlightObj != null)
+        if (_tileIndicatorObj != null)
         {
-            Destroy(_gridHighlightObj);
+            Destroy(_tileIndicatorObj);
         }
     }
 
     private void SetupGridHighlighter()
     {
-        if (_gridHighlightObj != null) return;
+        if (_tileIndicatorObj != null) return;
 
-        _gridHighlightObj = new GameObject("GridTargetHighlighter");
-        _gridLineRenderer = _gridHighlightObj.AddComponent<LineRenderer>();
-        _gridLineRenderer.useWorldSpace = true;
-        _gridLineRenderer.loop = true;
-        _gridLineRenderer.positionCount = 4;
-        _gridLineRenderer.startWidth = 0.04f;
-        _gridLineRenderer.endWidth = 0.04f;
-
-        // Gunakan default sprite material agar tidak pink/missing
-        Shader spriteShader = Shader.Find("Sprites/Default");
-        if (spriteShader != null)
-        {
-            _gridLineRenderer.material = new Material(spriteShader);
-        }
-
-        _gridLineRenderer.startColor = highlightColorDefault;
-        _gridLineRenderer.endColor = highlightColorDefault;
+        _tileIndicatorObj = new GameObject("GridTileSelector");
+        _tileIndicator = _tileIndicatorObj.AddComponent<TilePlacementIndicator>();
+        _tileIndicator.Initialize(this, _playerMovement, _playerInventory, _playerPlanter, selectorFrames);
     }
 
     private void Update()
     {
         if (!IsOwner) return;
 
-        // Update target posisi & in-game grid highlight
-        Vector3 targetPos = GetTargetWorldPosition();
-        Vector3 cellCenter = GetTargetCellCenter(targetPos);
-        UpdateGridHighlighter(cellCenter);
+        Vector3 targetCenter = GetTargetCellCenter(GetTargetWorldPosition());
 
         // ==========================================
-        // ATURAN BATCH 3 & SEED SYSTEM: LOCK AKSI SAAT MEMBAWA BARANG
+        // ATURAN PEMBAWAAN BARANG (Crop vs Seed)
         // ==========================================
         bool isCarryingItem = _playerInventory != null && _playerInventory.HasItem;
         if (isCarryingItem)
         {
-            // Pastikan alat tidak aktif saat membawa barang
             alatDiTangan = TipeAlat.TanganKosong;
-
-            // Jika pemain mencoba menggunakan alat, berikan peringatan dan batalkan aksi
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Backslash) || Input.GetKeyDown(KeyCode.RightBracket) ||
-                Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Alpha3))
-            {
-                string itemTag = _playerInventory.IsHoldingSeed ? $"{_playerInventory.HeldType} [Benih]" : $"{_playerInventory.HeldType}";
-                string actionHint = _playerInventory.IsHoldingSeed ? "Tanam dengan [E] pada lahan garapan terlebih dahulu." : "Setor ke Silo terlebih dahulu.";
-                Debug.Log($"<color=orange>[PlayerAction]</color> Tangan sedang membawa '{itemTag}'! Tidak dapat mencangkul, menyiram, atau mengganti alat. {actionHint}");
-            }
-            return;
         }
 
         // ==========================================
-        // 1. BYPASS SHORTCUT (Testing Cepat)
+        // 1. GANTI ALAT CEPAT (Angka 1, 2, 3)
         // ==========================================
-        // Tekan '\' (Backslash) untuk MENCANGKUL paksa petak target
+        if (!isCarryingItem)
+        {
+            if (Input.GetKeyDown(KeyCode.Alpha1))
+            {
+                alatDiTangan = TipeAlat.TanganKosong;
+                Debug.Log("[PlayerAction] Alat aktif: Tangan Kosong");
+            }
+            else if (Input.GetKeyDown(KeyCode.Alpha2))
+            {
+                alatDiTangan = TipeAlat.Cangkul;
+                Debug.Log("[PlayerAction] Alat aktif: Cangkul");
+            }
+            else if (Input.GetKeyDown(KeyCode.Alpha3))
+            {
+                alatDiTangan = TipeAlat.AlatSiram;
+                Debug.Log("[PlayerAction] Alat aktif: Alat Siram");
+            }
+        }
+
+        // ==========================================
+        // 2. BYPASS SHORTCUT (Testing Cepat)
+        // ==========================================
         if (Input.GetKeyDown(KeyCode.Backslash))
         {
             if (LahanManagerTilemap.Instance != null)
             {
-                Debug.Log($"[Bypass] Mencangkul tanah di {cellCenter}!");
-                LahanManagerTilemap.Instance.MintaCangkul(targetPos);
+                Debug.Log($"[Bypass] Mencangkul tanah di {targetCenter}!");
+                LahanManagerTilemap.Instance.MintaCangkul(targetCenter);
             }
         }
 
-        // Tekan ']' (Right Bracket) untuk MENYIRAM paksa petak target
         if (Input.GetKeyDown(KeyCode.RightBracket))
         {
             if (LahanManagerTilemap.Instance != null)
             {
-                Debug.Log($"[Bypass] Menyiram tanah di {cellCenter}!");
-                LahanManagerTilemap.Instance.MintaSiram(targetPos);
+                Debug.Log($"[Bypass] Menyiram tanah di {targetCenter}!");
+                LahanManagerTilemap.Instance.MintaSiram(targetCenter);
             }
         }
 
         // ==========================================
-        // 2. GANTI ALAT CEPAT (Angka 1, 2, 3)
+        // 3. EKSEKUSI AKSI HYBRID (Klik Kiri Mouse & Tombol Space)
         // ==========================================
-        if (Input.GetKeyDown(KeyCode.Alpha1))
+        bool mouseClicked = Input.GetMouseButtonDown(0);
+        bool spacePressed = Input.GetKeyDown(KeyCode.Space);
+
+        // Jika mouse diklik namun kursor sedang berada di atas elemen UI, batalkan eksekusi aksi
+        if (mouseClicked && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
         {
-            alatDiTangan = TipeAlat.TanganKosong;
-            Debug.Log("[PlayerAction] Alat aktif: Tangan Kosong");
-        }
-        else if (Input.GetKeyDown(KeyCode.Alpha2))
-        {
-            alatDiTangan = TipeAlat.Cangkul;
-            Debug.Log("[PlayerAction] Alat aktif: Cangkul");
-        }
-        else if (Input.GetKeyDown(KeyCode.Alpha3))
-        {
-            alatDiTangan = TipeAlat.AlatSiram;
-            Debug.Log("[PlayerAction] Alat aktif: Alat Siram");
+            return;
         }
 
-        // ==========================================
-        // 3. GUNAKAN ALAT (Tombol Space)
-        // ==========================================
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (mouseClicked || spacePressed)
         {
-            if (LahanManagerTilemap.Instance == null)
-            {
-                Debug.LogWarning("[PlayerAction] LahanManagerTilemap belum ditemukan di scene!");
-                return;
-            }
-
-            switch (alatDiTangan)
-            {
-                case TipeAlat.Cangkul:
-                    LahanManagerTilemap.Instance.MintaCangkul(targetPos);
-                    break;
-                case TipeAlat.AlatSiram:
-                    LahanManagerTilemap.Instance.MintaSiram(targetPos);
-                    break;
-                case TipeAlat.TanganKosong:
-                    // Coba memanen tanaman jika ada tanaman matang di petak depan pemain
-                    if (TryHarvestPlantAt(targetPos))
-                    {
-                        break;
-                    }
-                    Debug.Log("[PlayerAction] Tangan kosong! Tekan '2' untuk Cangkul, '3' untuk Alat Siram, atau dekati tanaman matang untuk memanen.");
-                    break;
-            }
+            ExecuteActionAt(targetCenter);
         }
     }
 
-    private bool TryHarvestPlantAt(Vector3 targetPos)
+    private void ExecuteActionAt(Vector3 targetCenter)
+    {
+        // 1. Jika membawa hasil panen (Crop), tolak aksi mencangkul/menyiram/menanam
+        if (_playerInventory != null && _playerInventory.IsHoldingCrop)
+        {
+            Debug.Log($"<color=orange>[PlayerAction]</color> Tangan sedang membawa hasil panen '{_playerInventory.HeldType}'! Tidak dapat mencangkul, menyiram, atau menanam. Setor ke Silo terlebih dahulu.");
+            return;
+        }
+
+        // 2. Jika membawa benih (Seed), eksekusi penanaman ke petak
+        if (_playerInventory != null && _playerInventory.IsHoldingSeed)
+        {
+            if (_playerPlanter != null)
+            {
+                _playerPlanter.TryPlantAt(targetCenter);
+            }
+            return;
+        }
+
+        // 3. Putar arah hadap pemain menghadap petak target
+        if (_playerMovement != null)
+        {
+            Vector2 aimDir = (Vector2)(targetCenter - transform.position);
+            _playerMovement.SetFacingDirection(aimDir);
+        }
+
+        if (LahanManagerTilemap.Instance == null)
+        {
+            Debug.LogWarning("[PlayerAction] LahanManagerTilemap belum ditemukan di scene!");
+            return;
+        }
+
+        // 4. Eksekusi alat aktif
+        switch (alatDiTangan)
+        {
+            case TipeAlat.Cangkul:
+                LahanManagerTilemap.Instance.MintaCangkul(targetCenter);
+                break;
+
+            case TipeAlat.AlatSiram:
+                LahanManagerTilemap.Instance.MintaSiram(targetCenter);
+                break;
+
+            case TipeAlat.TanganKosong:
+                if (TryHarvestPlantAt(targetCenter))
+                {
+                    break;
+                }
+                Debug.Log("[PlayerAction] Tangan kosong! Tekan '2' untuk Cangkul, '3' untuk Alat Siram, atau arahkan ke tanaman matang untuk memanen.");
+                break;
+        }
+    }
+
+    public bool HasMaturePlantAt(Vector3 targetPos)
+    {
+        // 1. Cek via Physics2D Overlap di area petak target
+        Collider2D[] hits = Physics2D.OverlapCircleAll(targetPos, 0.45f);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Farming.Plant plant = hits[i].GetComponentInParent<Farming.Plant>();
+            if (plant != null && plant.IsMature)
+            {
+                return true;
+            }
+        }
+
+        // 2. Fallback cek via LahanManagerTilemap jika collider belum terdeteksi
+        if (LahanManagerTilemap.Instance != null)
+        {
+            GameObject plantObj = LahanManagerTilemap.Instance.GetTanaman(targetPos);
+            if (plantObj != null)
+            {
+                Farming.Plant plant = plantObj.GetComponent<Farming.Plant>();
+                if (plant != null && plant.IsMature)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public bool TryHarvestPlantAt(Vector3 targetPos)
     {
         // 1. Cek via Physics2D Overlap di area petak depan
         Collider2D[] hits = Physics2D.OverlapCircleAll(targetPos, 0.45f);
@@ -229,6 +277,11 @@ public class PlayerAction : NetworkBehaviour
 
     public Vector3 GetTargetWorldPosition()
     {
+        if (_tileIndicator != null)
+        {
+            return _tileIndicator.CurrentTargetCenter;
+        }
+
         Vector2 facing = (_playerMovement != null) ? _playerMovement.FacingDirection : Vector2.down;
         if (facing == Vector2.zero) facing = Vector2.down;
         return transform.position + (Vector3)(facing.normalized * reachDistance);
@@ -248,35 +301,14 @@ public class PlayerAction : NetworkBehaviour
         return new Vector3(snapX, snapY, 0f);
     }
 
-    private void UpdateGridHighlighter(Vector3 center)
-    {
-        if (_gridLineRenderer == null || !_gridLineRenderer.enabled) return;
-
-        // Pilih warna berdasarkan alat yang dipegang
-        Color activeColor = highlightColorDefault;
-        if (alatDiTangan == TipeAlat.Cangkul) activeColor = highlightColorCangkul;
-        else if (alatDiTangan == TipeAlat.AlatSiram) activeColor = highlightColorSiram;
-
-        _gridLineRenderer.startColor = activeColor;
-        _gridLineRenderer.endColor = activeColor;
-
-        // Gambar 4 sudut kotak grid (ukuran 1x1 cell)
-        float halfSize = 0.48f;
-        _gridLineRenderer.SetPosition(0, new Vector3(center.x - halfSize, center.y - halfSize, 0f));
-        _gridLineRenderer.SetPosition(1, new Vector3(center.x + halfSize, center.y - halfSize, 0f));
-        _gridLineRenderer.SetPosition(2, new Vector3(center.x + halfSize, center.y + halfSize, 0f));
-        _gridLineRenderer.SetPosition(3, new Vector3(center.x - halfSize, center.y + halfSize, 0f));
-    }
-
     private void OnDrawGizmos()
     {
         // Visualisasi kotak grid yang ditargetkan di Scene View editor
-        Vector3 targetPos = GetTargetWorldPosition();
-        Vector3 cellCenter = GetTargetCellCenter(targetPos);
+        Vector3 cellCenter = GetTargetCellCenter(GetTargetWorldPosition());
 
-        Color gizmoColor = highlightColorDefault;
-        if (alatDiTangan == TipeAlat.Cangkul) gizmoColor = highlightColorCangkul;
-        else if (alatDiTangan == TipeAlat.AlatSiram) gizmoColor = highlightColorSiram;
+        Color gizmoColor = Color.white;
+        if (alatDiTangan == TipeAlat.Cangkul) gizmoColor = Color.yellow;
+        else if (alatDiTangan == TipeAlat.AlatSiram) gizmoColor = Color.cyan;
 
         Gizmos.color = gizmoColor;
         Gizmos.DrawWireCube(cellCenter, new Vector3(0.96f, 0.96f, 0f));
