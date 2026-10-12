@@ -167,7 +167,7 @@ public class MainMenu : MonoBehaviour
         }
         else
         {
-            _introSequence.AppendInterval(logoFadeDuration);
+            _introSequence.AppendInterval(0.5f);
         }
 
         // 2. Setelah Logo selesai fade-in, Teks 'Press Any Key' muncul perlahan (alpha 0 ke 1)
