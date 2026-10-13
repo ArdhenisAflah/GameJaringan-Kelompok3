@@ -12,6 +12,8 @@ public class PlayerAnimation : NetworkBehaviour
     private Vector3 _lastPosition;
     private static readonly int IsWalkingHash = Animator.StringToHash("isWalking");
     private static readonly int IsTanamHash = Animator.StringToHash("isTanam");
+    private static readonly int IsWateringHash = Animator.StringToHash("isWatering");
+    private static readonly int IsDiggingHash = Animator.StringToHash("isDigging");
 
     // Sinkronisasi arah hadap kiri/kanan saat diam (Idle)
     private readonly SyncVar<bool> _isFacingLeft = new SyncVar<bool>();
@@ -137,5 +139,69 @@ public class PlayerAnimation : NetworkBehaviour
     private void ObserversPlayTanam()
     {
         PlayTanam();
+    }
+
+    /// <summary>
+    /// Memutar animasi menyiram tanaman secara lokal dan menyinkronkannya ke seluruh client.
+    /// </summary>
+    public void TriggerWateringAnimation()
+    {
+        PlayWatering();
+        if (IsClientInitialized)
+        {
+            ServerPlayWatering();
+        }
+    }
+
+    private void PlayWatering()
+    {
+        if (_animator != null && _animator.runtimeAnimatorController != null)
+        {
+            _animator.SetTrigger(IsWateringHash);
+        }
+    }
+
+    [ServerRpc]
+    private void ServerPlayWatering()
+    {
+        ObserversPlayWatering();
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void ObserversPlayWatering()
+    {
+        PlayWatering();
+    }
+
+    /// <summary>
+    /// Memutar animasi mencangkul tanah secara lokal dan menyinkronkannya ke seluruh client.
+    /// </summary>
+    public void TriggerDiggingAnimation()
+    {
+        PlayDigging();
+        if (IsClientInitialized)
+        {
+            ServerPlayDigging();
+        }
+    }
+
+    private void PlayDigging()
+    {
+        if (_animator != null && _animator.runtimeAnimatorController != null)
+        {
+            _animator.SetTrigger(IsDiggingHash);
+        }
+    }
+
+    [ServerRpc]
+    private void ServerPlayDigging()
+    {
+        ObserversPlayDigging();
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void ObserversPlayDigging()
+    {
+        PlayDigging();
     }
 }

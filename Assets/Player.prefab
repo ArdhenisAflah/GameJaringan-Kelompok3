@@ -318,6 +318,8 @@ MonoBehaviour:
   highlightColorCangkul: {r: 1, g: 0.85, b: 0.2, a: 0.85}
   highlightColorSiram: {r: 0.2, g: 0.75, b: 1, a: 0.85}
   highlightColorDefault: {r: 1, g: 1, b: 1, a: 0.5}
+  wateringDuration: 0.52
+  diggingDuration: 0.35
 --- !u!95 &6454592082542550306
 Animator:
   serializedVersion: 5

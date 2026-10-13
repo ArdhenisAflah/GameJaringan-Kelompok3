@@ -19,14 +19,31 @@ public class PlayerMovement : NetworkBehaviour, Farming.IWiggleTriggerSource
     public Vector2 Velocity => rb != null ? rb.velocity : Vector2.zero;
 
     /// <summary>
-    /// Arah hadap terakhir pemain (terkoreksi saat bergerak).
-    /// Digunakan oleh sistem aksi (seperti PlayerPlanter) untuk menentukan titik di depan pemain.
-    /// Default menghadap ke bawah (Vector2.down).
+    /// Mengetahui apakah karakter sedang bergerak atau diam
     /// </summary>
-    /// 
-    /// // Mengetahui apakah karakter sedang bergerak atau diam
     public bool IsMoving => movement.sqrMagnitude > 0.01f;
     public Vector2 FacingDirection { get; private set; } = Vector2.down;
+
+    /// <summary>
+    /// Status penguncian pergerakan (misalnya saat animasi menyiram tanaman sedang berjalan).
+    /// </summary>
+    public bool IsMovementLocked { get; private set; }
+
+    /// <summary>
+    /// Mengunci atau membuka kunci pergerakan pemain. Saat dikunci, velocity Rigidbody dihentikan seketika.
+    /// </summary>
+    public void SetMovementLocked(bool isLocked)
+    {
+        IsMovementLocked = isLocked;
+        if (isLocked)
+        {
+            movement = Vector2.zero;
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+        }
+    }
 
     private void Awake()
     {
@@ -74,6 +91,13 @@ public class PlayerMovement : NetworkBehaviour, Farming.IWiggleTriggerSource
     {
         if (!IsOwner) return; // Hanya pemilik objek yang dapat mengontrol pergerakan
 
+        // Jika pergerakan sedang dikunci (misal saat animasi aksi seperti menyiram tanaman), abaikan input
+        if (IsMovementLocked)
+        {
+            movement = Vector2.zero;
+            return;
+        }
+
         // 1. Mengambil Input (Selalu lakukan di Update agar responsif)
         // GetAxisRaw membuat kontrol lebih "snappy" (langsung jalan/berhenti tanpa efek licin)
         movement.x = Input.GetAxisRaw("Horizontal");
@@ -92,6 +116,12 @@ public class PlayerMovement : NetworkBehaviour, Farming.IWiggleTriggerSource
     private void FixedUpdate()
     {
         if (!IsOwner) return;
+
+        if (IsMovementLocked)
+        {
+            rb.velocity = Vector2.zero;
+            return;
+        }
 
         // 2. Mengaplikasikan Pergerakan Fisika (Selalu lakukan di FixedUpdate)
         rb.velocity = movement * moveSpeed;

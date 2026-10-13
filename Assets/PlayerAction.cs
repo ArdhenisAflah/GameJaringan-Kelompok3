@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using FishNet.Object;
 
@@ -23,15 +24,50 @@ public class PlayerAction : NetworkBehaviour
     [SerializeField] private Color highlightColorSiram = new Color(0.2f, 0.75f, 1f, 0.85f);
     [SerializeField] private Color highlightColorDefault = new Color(1f, 1f, 1f, 0.5f);
 
+    [Header("Animasi & Durasi Aksi")]
+    [Tooltip("Durasi animasi menyiram tanaman sebelum pemain dapat bergerak kembali (detik).")]
+    [SerializeField] private float wateringDuration = 0.52f;
+    [Tooltip("Durasi animasi mencangkul tanah sebelum pemain dapat bergerak kembali (detik).")]
+    [SerializeField] private float diggingDuration = 0.35f;
+
     private PlayerMovement _playerMovement;
+    private PlayerAnimation _playerAnimation;
     private SiloSystem.PlayerInventory _playerInventory;
     private GameObject _gridHighlightObj;
     private LineRenderer _gridLineRenderer;
+    private bool _isActionLocked;
+    private Coroutine _wateringCoroutine;
+    private Coroutine _diggingCoroutine;
 
     private void Awake()
     {
         _playerMovement = GetComponent<PlayerMovement>();
+        _playerAnimation = GetComponent<PlayerAnimation>();
         _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
+    }
+
+    private void OnDisable()
+    {
+        if (_wateringCoroutine != null)
+        {
+            StopCoroutine(_wateringCoroutine);
+            _wateringCoroutine = null;
+        }
+
+        if (_diggingCoroutine != null)
+        {
+            StopCoroutine(_diggingCoroutine);
+            _diggingCoroutine = null;
+        }
+
+        if (_isActionLocked)
+        {
+            _isActionLocked = false;
+            if (_playerMovement != null)
+            {
+                _playerMovement.SetMovementLocked(false);
+            }
+        }
     }
 
     public override void OnStartClient()
@@ -105,6 +141,9 @@ public class PlayerAction : NetworkBehaviour
         Vector3 cellCenter = GetTargetCellCenter(targetPos);
         UpdateGridHighlighter(cellCenter);
 
+        // Jika pemain sedang dalam proses aksi (misal sedang menyiram), abaikan input baru
+        if (_isActionLocked) return;
+
         // ==========================================
         // ATURAN BATCH 3 & SEED SYSTEM: LOCK AKSI SAAT MEMBAWA BARANG
         // ==========================================
@@ -134,7 +173,7 @@ public class PlayerAction : NetworkBehaviour
             if (LahanManagerTilemap.Instance != null)
             {
                 Debug.Log($"[Bypass] Mencangkul tanah di {cellCenter}!");
-                LahanManagerTilemap.Instance.MintaCangkul(targetPos);
+                ExecuteDiggingAction(targetPos);
             }
         }
 
@@ -144,7 +183,7 @@ public class PlayerAction : NetworkBehaviour
             if (LahanManagerTilemap.Instance != null)
             {
                 Debug.Log($"[Bypass] Menyiram tanah di {cellCenter}!");
-                LahanManagerTilemap.Instance.MintaSiram(targetPos);
+                ExecuteWateringAction(targetPos);
             }
         }
 
@@ -158,8 +197,13 @@ public class PlayerAction : NetworkBehaviour
         }
         else if (Input.GetKeyDown(KeyCode.Alpha2))
         {
+            bool wasAlreadyCangkul = (alatDiTangan == TipeAlat.Cangkul);
             alatDiTangan = TipeAlat.Cangkul;
             Debug.Log("[PlayerAction] Alat aktif: Cangkul");
+            if (wasAlreadyCangkul)
+            {
+                ExecuteDiggingAction(targetPos);
+            }
         }
         else if (Input.GetKeyDown(KeyCode.Alpha3))
         {
@@ -181,10 +225,10 @@ public class PlayerAction : NetworkBehaviour
             switch (alatDiTangan)
             {
                 case TipeAlat.Cangkul:
-                    LahanManagerTilemap.Instance.MintaCangkul(targetPos);
+                    ExecuteDiggingAction(targetPos);
                     break;
                 case TipeAlat.AlatSiram:
-                    LahanManagerTilemap.Instance.MintaSiram(targetPos);
+                    ExecuteWateringAction(targetPos);
                     break;
                 case TipeAlat.TanganKosong:
                     // Coba memanen tanaman jika ada tanaman matang di petak depan pemain
@@ -196,6 +240,158 @@ public class PlayerAction : NetworkBehaviour
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// Memeriksa apakah petak target dapat dicangkul (belum dicangkul / belum berupa TileKering dan tidak ada tanaman).
+    /// </summary>
+    public bool CanDigAt(Vector3 targetPos)
+    {
+        if (LahanManagerTilemap.Instance == null) return false;
+
+        // Validasi: Petak tanah belum dicangkul (belum berupa TileKering)
+        if (LahanManagerTilemap.Instance.HasTileKering(targetPos))
+        {
+            Debug.Log("<color=orange>[PlayerAction]</color> Tidak dapat mencangkul: Petak tanah sudah dicangkul (sudah berupa TileKering).");
+            return false;
+        }
+
+        // Validasi: Petak tanah tidak terdapat tanaman
+        if (LahanManagerTilemap.Instance.IsPetakDitanam(targetPos))
+        {
+            Debug.Log("<color=orange>[PlayerAction]</color> Tidak dapat mencangkul: Petak tanah terdapat tanaman.");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Menjalankan aksi mencangkul tanah disertai animasi digging_animation dan penguncian pergerakan karakter.
+    /// </summary>
+    private void ExecuteDiggingAction(Vector3 targetPos)
+    {
+        if (_isActionLocked) return;
+
+        // Validasi: Hanya picu animasi dan aksi jika tanah belum dicangkul
+        if (!CanDigAt(targetPos)) return;
+
+        if (_diggingCoroutine != null)
+        {
+            StopCoroutine(_diggingCoroutine);
+        }
+        _diggingCoroutine = StartCoroutine(DiggingRoutine(targetPos));
+    }
+
+    private IEnumerator DiggingRoutine(Vector3 targetPos)
+    {
+        _isActionLocked = true;
+
+        // Kunci input dan pergerakan fisik karakter agar tidak bergeser saat mencangkul
+        if (_playerMovement != null)
+        {
+            _playerMovement.SetMovementLocked(true);
+        }
+
+        // Picu animasi mencangkul (digging_animation) ke Animator lokal dan jaringan
+        if (_playerAnimation != null)
+        {
+            _playerAnimation.TriggerDiggingAnimation();
+        }
+
+        // Minta sistem tilemap lahan untuk mencangkul petak tanah
+        if (LahanManagerTilemap.Instance != null)
+        {
+            LahanManagerTilemap.Instance.MintaCangkul(targetPos);
+        }
+
+        // Tunggu durasi animasi mencangkul selesai
+        yield return new WaitForSeconds(diggingDuration);
+
+        // Buka kembali kunci pergerakan karakter
+        if (_playerMovement != null)
+        {
+            _playerMovement.SetMovementLocked(false);
+        }
+
+        _isActionLocked = false;
+        _diggingCoroutine = null;
+    }
+
+    /// <summary>
+    /// Memeriksa apakah petak target dapat disiram (harus memiliki TileKering dan belum disiram).
+    /// </summary>
+    public bool CanWaterAt(Vector3 targetPos)
+    {
+        if (LahanManagerTilemap.Instance == null) return false;
+
+        // Validasi: Petak tanah harus sudah dicangkul / memiliki TileKering
+        if (!LahanManagerTilemap.Instance.HasTileKering(targetPos))
+        {
+            Debug.Log("<color=orange>[PlayerAction]</color> Tidak dapat menyiram: Petak tanah belum memiliki TileKering (belum dicangkul). Cangkul tanah terlebih dahulu.");
+            return false;
+        }
+
+        // Validasi: Petak tanah belum disiram (belum basah)
+        if (LahanManagerTilemap.Instance.IsPetakDisiram(targetPos))
+        {
+            Debug.Log("<color=orange>[PlayerAction]</color> Tidak dapat menyiram: Petak tanah sudah basah (sudah disiram).");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Menjalankan aksi menyiram tanaman disertai animasi watering_plant dan penguncian pergerakan karakter.
+    /// </summary>
+    private void ExecuteWateringAction(Vector3 targetPos)
+    {
+        if (_isActionLocked) return;
+
+        // Validasi: Hanya picu animasi dan aksi jika tanah sudah berupa TileKering
+        if (!CanWaterAt(targetPos)) return;
+
+        if (_wateringCoroutine != null)
+        {
+            StopCoroutine(_wateringCoroutine);
+        }
+        _wateringCoroutine = StartCoroutine(WateringRoutine(targetPos));
+    }
+
+    private IEnumerator WateringRoutine(Vector3 targetPos)
+    {
+        _isActionLocked = true;
+
+        // Kunci input dan pergerakan fisik karakter agar tidak meluncur saat menyiram
+        if (_playerMovement != null)
+        {
+            _playerMovement.SetMovementLocked(true);
+        }
+
+        // Picu animasi menyiram (watering_plant) ke Animator lokal dan jaringan
+        if (_playerAnimation != null)
+        {
+            _playerAnimation.TriggerWateringAnimation();
+        }
+
+        // Minta sistem tilemap lahan untuk membasahi petak
+        if (LahanManagerTilemap.Instance != null)
+        {
+            LahanManagerTilemap.Instance.MintaSiram(targetPos);
+        }
+
+        // Tunggu durasi animasi menyiram selesai
+        yield return new WaitForSeconds(wateringDuration);
+
+        // Buka kembali kunci pergerakan karakter
+        if (_playerMovement != null)
+        {
+            _playerMovement.SetMovementLocked(false);
+        }
+
+        _isActionLocked = false;
+        _wateringCoroutine = null;
     }
 
     private bool TryHarvestPlantAt(Vector3 targetPos)

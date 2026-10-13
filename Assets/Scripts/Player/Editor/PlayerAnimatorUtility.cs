@@ -17,6 +17,8 @@ namespace PlayerVisual.Editor
         private const string PickClipPath = "Assets/Animations/pick.anim";
         private const string PickupIdleClipPath = "Assets/Animations/pickup_idle.anim";
         private const string PickupWalkClipPath = "Assets/Animations/pickup_walk.anim";
+        private const string WateringClipPath = "Assets/Animations/watering_plant.anim";
+        private const string DiggingClipPath = "Assets/Animations/digging_animation.anim";
 
         static PlayerAnimatorUtility()
         {
@@ -38,9 +40,11 @@ namespace PlayerVisual.Editor
 
             bool changed = false;
 
-            // 2. Pastikan parameter 'isHolding' dan 'pick' tersedia
+            // 2. Pastikan parameter 'isHolding', 'pick', 'isWatering', dan 'isDigging' tersedia
             bool hasHolding = controller.parameters.Any(p => p.name == "isHolding");
             bool hasPick = controller.parameters.Any(p => p.name == "pick");
+            bool hasWatering = controller.parameters.Any(p => p.name == "isWatering");
+            bool hasDigging = controller.parameters.Any(p => p.name == "isDigging");
 
             if (!hasHolding)
             {
@@ -54,6 +58,20 @@ namespace PlayerVisual.Editor
                 controller.AddParameter("pick", AnimatorControllerParameterType.Trigger);
                 changed = true;
                 Debug.Log("<color=green>[PlayerAnimatorUtility]</color> Parameter 'pick' (Trigger) berhasil ditambahkan.");
+            }
+
+            if (!hasWatering)
+            {
+                controller.AddParameter("isWatering", AnimatorControllerParameterType.Trigger);
+                changed = true;
+                Debug.Log("<color=green>[PlayerAnimatorUtility]</color> Parameter 'isWatering' (Trigger) berhasil ditambahkan.");
+            }
+
+            if (!hasDigging)
+            {
+                controller.AddParameter("isDigging", AnimatorControllerParameterType.Trigger);
+                changed = true;
+                Debug.Log("<color=green>[PlayerAnimatorUtility]</color> Parameter 'isDigging' (Trigger) berhasil ditambahkan.");
             }
 
             // 3. Pastikan State Machine dan Animasi Pickup terhubung
@@ -178,6 +196,108 @@ namespace PlayerVisual.Editor
                     t.hasExitTime = false;
                     t.AddCondition(AnimatorConditionMode.IfNot, 0, "isHolding");
                     t.AddCondition(AnimatorConditionMode.IfNot, 0, "isWalking");
+                    changed = true;
+                }
+
+                // 4. Pastikan State Machine dan Animasi Watering terhubung
+                AnimationClip wateringClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(WateringClipPath);
+                AnimatorState wateringState = rootSm.states.FirstOrDefault(s => s.state.name == "watering_plant").state;
+
+                if (wateringState == null && wateringClip != null)
+                {
+                    wateringState = rootSm.AddState("watering_plant", new Vector3(300, 200, 0));
+                    wateringState.motion = wateringClip;
+                    changed = true;
+                }
+                else if (wateringState != null && wateringState.motion == null && wateringClip != null)
+                {
+                    wateringState.motion = wateringClip;
+                    changed = true;
+                }
+
+                // AnyState -> watering_plant
+                if (wateringState != null && !rootSm.anyStateTransitions.Any(t => t.destinationState == wateringState))
+                {
+                    AnimatorStateTransition anyToWater = rootSm.AddAnyStateTransition(wateringState);
+                    anyToWater.duration = 0f;
+                    anyToWater.hasExitTime = false;
+                    anyToWater.canTransitionToSelf = false;
+                    anyToWater.AddCondition(AnimatorConditionMode.If, 0, "isWatering");
+                    changed = true;
+                }
+
+                // watering_plant -> Walk
+                if (wateringState != null && walkState != null && !wateringState.transitions.Any(t => t.destinationState == walkState))
+                {
+                    AnimatorStateTransition toWalk = wateringState.AddTransition(walkState);
+                    toWalk.duration = 0.05f;
+                    toWalk.hasExitTime = true;
+                    toWalk.exitTime = 1f;
+                    toWalk.hasFixedDuration = true;
+                    toWalk.AddCondition(AnimatorConditionMode.If, 0, "isWalking");
+                    changed = true;
+                }
+
+                // watering_plant -> Idle
+                if (wateringState != null && idleState != null && !wateringState.transitions.Any(t => t.destinationState == idleState))
+                {
+                    AnimatorStateTransition toIdle = wateringState.AddTransition(idleState);
+                    toIdle.duration = 0.05f;
+                    toIdle.hasExitTime = true;
+                    toIdle.exitTime = 1f;
+                    toIdle.hasFixedDuration = true;
+                    toIdle.AddCondition(AnimatorConditionMode.IfNot, 0, "isWalking");
+                    changed = true;
+                }
+
+                // 5. Pastikan State Machine dan Animasi Digging terhubung
+                AnimationClip diggingClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(DiggingClipPath);
+                AnimatorState diggingState = rootSm.states.FirstOrDefault(s => s.state.name == "digging_animation").state;
+
+                if (diggingState == null && diggingClip != null)
+                {
+                    diggingState = rootSm.AddState("digging_animation", new Vector3(300, 260, 0));
+                    diggingState.motion = diggingClip;
+                    changed = true;
+                }
+                else if (diggingState != null && diggingState.motion == null && diggingClip != null)
+                {
+                    diggingState.motion = diggingClip;
+                    changed = true;
+                }
+
+                // AnyState -> digging_animation
+                if (diggingState != null && !rootSm.anyStateTransitions.Any(t => t.destinationState == diggingState))
+                {
+                    AnimatorStateTransition anyToDig = rootSm.AddAnyStateTransition(diggingState);
+                    anyToDig.duration = 0f;
+                    anyToDig.hasExitTime = false;
+                    anyToDig.canTransitionToSelf = false;
+                    anyToDig.AddCondition(AnimatorConditionMode.If, 0, "isDigging");
+                    changed = true;
+                }
+
+                // digging_animation -> Walk
+                if (diggingState != null && walkState != null && !diggingState.transitions.Any(t => t.destinationState == walkState))
+                {
+                    AnimatorStateTransition toWalk = diggingState.AddTransition(walkState);
+                    toWalk.duration = 0.05f;
+                    toWalk.hasExitTime = true;
+                    toWalk.exitTime = 1f;
+                    toWalk.hasFixedDuration = true;
+                    toWalk.AddCondition(AnimatorConditionMode.If, 0, "isWalking");
+                    changed = true;
+                }
+
+                // digging_animation -> Idle
+                if (diggingState != null && idleState != null && !diggingState.transitions.Any(t => t.destinationState == idleState))
+                {
+                    AnimatorStateTransition toIdle = diggingState.AddTransition(idleState);
+                    toIdle.duration = 0.05f;
+                    toIdle.hasExitTime = true;
+                    toIdle.exitTime = 1f;
+                    toIdle.hasFixedDuration = true;
+                    toIdle.AddCondition(AnimatorConditionMode.IfNot, 0, "isWalking");
                     changed = true;
                 }
             }
