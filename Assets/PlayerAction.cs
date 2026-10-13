@@ -10,7 +10,7 @@ public class PlayerAction : NetworkBehaviour
 
     [Header("Jangkauan Aksi")]
     [Tooltip("Jarak petak di depan pemain yang ditargetkan.")]
-    [SerializeField] private float reachDistance = 1.0f;
+    [SerializeField] private float reachDistance = 0.6f;
 
     [Header("Visual Grid Highlight")]
     [Tooltip("Menampilkan kotak highlight target di Game View.")]

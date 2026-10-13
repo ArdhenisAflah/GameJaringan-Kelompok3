@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 7201433464415856501}
   - component: {fileID: 6255449745752365367}
   - component: {fileID: -647378733050302277}
+  - component: {fileID: 834918237465019283}
   m_Layer: 7
   m_Name: PlantPrefab
   m_TagString: Untagged
@@ -73,8 +74,8 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 2519284102
-  m_SortingLayer: 0
+  m_SortingLayerID: -1775683194
+  m_SortingLayer: 3
   m_SortingOrder: 5
   m_Sprite: {fileID: -1829352138, guid: 0c2acf6f62953be4484332886917df07, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -161,6 +162,8 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 7201433464415856501}
   _networkObjectCache: {fileID: 7201433464415856501}
   plantName: Padi
+  cropType: 1
+  harvestYield: 1
   maxGrowthStage: 3
   timePerStage: 10
   spriteRenderer: {fileID: 401518257455248661}
@@ -197,9 +200,35 @@ CircleCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 0, y: 0.1}
   serializedVersion: 2
-  m_Radius: 0.9
+  m_Radius: 0.35
+--- !u!114 &834918237465019283
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 663978825772099299}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b01c03a5c5a4aa9b2564c66188343df, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  visualTransform: {fileID: 5003089500813072328}
+  spriteRenderer: {fileID: 401518257455248661}
+  triggerLayers:
+    serializedVersion: 2
+    m_Bits: 256
+  targetTag: Player
+  allowTriggerSourceInterface: 1
+  maxWiggleAngle: 12
+  wiggleDuration: 0.35
+  wiggleFrequency: 22
+  damping: 6
+  retriggerCooldown: 0.15
+  enableSquashAndStretch: 1
+  squashAmount: 0.08

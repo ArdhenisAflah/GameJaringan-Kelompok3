@@ -3,7 +3,7 @@ using FishNet.Object;
 
 // Memastikan komponen Rigidbody2D otomatis ditambahkan ke GameObject
 [RequireComponent(typeof(Rigidbody2D))]
-public class PlayerMovement : NetworkBehaviour
+public class PlayerMovement : NetworkBehaviour, Farming.IWiggleTriggerSource
 {
     [Header("Pengaturan Pergerakan")]
     [Tooltip("Kecepatan berjalan karakter.")]
@@ -11,6 +11,12 @@ public class PlayerMovement : NetworkBehaviour
 
     private Rigidbody2D rb;
     private Vector2 movement;
+
+    /// <summary>
+    /// Implementasi IWiggleTriggerSource untuk memicu efek goyang pada tanaman saat melintas.
+    /// </summary>
+    public Farming.TriggerEntityType EntityType => Farming.TriggerEntityType.Player;
+    public Vector2 Velocity => rb != null ? rb.velocity : Vector2.zero;
 
     /// <summary>
     /// Arah hadap terakhir pemain (terkoreksi saat bergerak).

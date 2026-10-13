@@ -287,7 +287,7 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 4326351770396735908}
   plantKey: 101
   placementType: 0
-  reachDistance: 1
+  reachDistance: 0.6
   gridSize: 1
   plantPrefab: {fileID: 663978825772099299, guid: 2b265d5907a0aae409077052d888c80b, type: 3}
   blockedLayers:
@@ -311,7 +311,7 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 4326351770396735908}
   _networkObjectCache: {fileID: 4326351770396735908}
   alatDiTangan: 0
-  reachDistance: 1
+  reachDistance: 0.6
   showGridHighlight: 1
   highlightColorCangkul: {r: 1, g: 0.85, b: 0.2, a: 0.85}
   highlightColorSiram: {r: 0.2, g: 0.75, b: 1, a: 0.85}

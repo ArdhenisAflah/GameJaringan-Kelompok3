@@ -24,7 +24,7 @@ namespace Farming
         [SerializeField] private PlacementType placementType = PlacementType.Grid;
 
         [Tooltip("Jarak jangkauan titik tanam di depan pemain.")]
-        [SerializeField] private float reachDistance = 1.0f;
+        [SerializeField] private float reachDistance = 0.6f;
 
         [Tooltip("Ukuran petak jika menggunakan PlacementType.Grid.")]
         [SerializeField] private float gridSize = 1.0f;
