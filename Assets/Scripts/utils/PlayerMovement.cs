@@ -22,6 +22,17 @@ public class PlayerMovement : NetworkBehaviour
     public bool IsMoving => movement.sqrMagnitude > 0.01f;
     public Vector2 FacingDirection { get; private set; } = Vector2.down;
 
+    /// <summary>
+    /// Mengubah arah hadap pemain secara manual (misal saat membidik ke arah kursor mouse).
+    /// </summary>
+    public void SetFacingDirection(Vector2 direction)
+    {
+        if (direction.sqrMagnitude > 0.001f)
+        {
+            FacingDirection = direction.normalized;
+        }
+    }
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();

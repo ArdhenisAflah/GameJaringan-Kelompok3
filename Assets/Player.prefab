@@ -313,9 +313,15 @@ MonoBehaviour:
   alatDiTangan: 0
   reachDistance: 1
   showGridHighlight: 1
-  highlightColorCangkul: {r: 1, g: 0.85, b: 0.2, a: 0.85}
-  highlightColorSiram: {r: 0.2, g: 0.75, b: 1, a: 0.85}
-  highlightColorDefault: {r: 1, g: 1, b: 1, a: 0.5}
+  selectorFrames:
+  - {fileID: 189553930, guid: a7cbb366fdff336468c325de6e2ac228, type: 3}
+  - {fileID: -1466047748, guid: a7cbb366fdff336468c325de6e2ac228, type: 3}
+  - {fileID: -1917515413, guid: a7cbb366fdff336468c325de6e2ac228, type: 3}
+  - {fileID: -232828246, guid: a7cbb366fdff336468c325de6e2ac228, type: 3}
+  - {fileID: -1713348261, guid: a7cbb366fdff336468c325de6e2ac228, type: 3}
+  - {fileID: 1187497609, guid: a7cbb366fdff336468c325de6e2ac228, type: 3}
+  - {fileID: -346845426, guid: a7cbb366fdff336468c325de6e2ac228, type: 3}
+  - {fileID: -140877499, guid: a7cbb366fdff336468c325de6e2ac228, type: 3}
 --- !u!95 &6454592082542550306
 Animator:
   serializedVersion: 5

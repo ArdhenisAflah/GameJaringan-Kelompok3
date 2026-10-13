@@ -49,11 +49,13 @@ namespace Farming
         private PlayerMovement _playerMovement;
         private SiloSystem.PlayerInventory _playerInventory;
         private IPlacementStrategy _placementStrategy;
+        private PlayerAction _playerAction;
 
         private void Awake()
         {
             _playerMovement = GetComponent<PlayerMovement>();
             _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
+            _playerAction = GetComponent<PlayerAction>();
             if (GetComponent<PlayerSeedInteractor>() == null)
             {
                 gameObject.AddComponent<PlayerSeedInteractor>();
@@ -80,23 +82,99 @@ namespace Farming
 
             if (Input.GetKeyDown(plantKey) && Time.time >= _lastPlantTime + plantCooldown)
             {
-                // 1. Tolak jika tangan sedang membawa hasil panen (Crop)
-                if (_playerInventory != null && _playerInventory.IsHoldingCrop)
+                Vector2 targetPos;
+                if (_playerAction != null && _playerAction.TileIndicator != null)
                 {
-                    Debug.Log($"<color=orange>[PlayerPlanter]</color> Tangan sedang membawa hasil panen '{_playerInventory.HeldType}'! Tidak dapat menanam. Kosongkan tangan atau setor ke Silo terlebih dahulu.");
-                    return;
+                    targetPos = _playerAction.TileIndicator.CurrentTargetCenter;
+                }
+                else
+                {
+                    Vector2 facingDir = _playerMovement != null ? _playerMovement.FacingDirection : Vector2.down;
+                    targetPos = GetTargetPosition(facingDir);
                 }
 
-                // 2. Tolak jika tangan tidak memegang benih (Seed)
-                if (_playerInventory == null || !_playerInventory.IsHoldingSeed)
-                {
-                    Debug.Log("<color=orange>[PlayerPlanter]</color> Tidak ada benih di tangan! Ambil benih dari Source Seed terlebih dahulu (tekan [F] di dekat sumber benih).");
-                    return;
-                }
-
-                _lastPlantTime = Time.time;
-                RequestPlantAction();
+                TryPlantAt(targetPos);
             }
+        }
+
+        /// <summary>
+        /// Menjalankan penanaman pada koordinat target tertentu (misal dari TilePlacementIndicator).
+        /// </summary>
+        public bool TryPlantAt(Vector2 targetPosition)
+        {
+            if (!IsOwner) return false;
+
+            // 1. Tolak jika tangan sedang membawa hasil panen (Crop)
+            if (_playerInventory != null && _playerInventory.IsHoldingCrop)
+            {
+                Debug.Log($"<color=orange>[PlayerPlanter]</color> Tangan sedang membawa hasil panen '{_playerInventory.HeldType}'! Tidak dapat menanam. Kosongkan tangan atau setor ke Silo terlebih dahulu.");
+                return false;
+            }
+
+            // 2. Tolak jika tangan tidak memegang benih (Seed)
+            if (_playerInventory == null || !_playerInventory.IsHoldingSeed)
+            {
+                Debug.Log("<color=orange>[PlayerPlanter]</color> Tidak ada benih di tangan! Ambil benih dari Source Seed terlebih dahulu (tekan [F] di dekat sumber benih).");
+                return false;
+            }
+
+            if (Time.time < _lastPlantTime + plantCooldown)
+            {
+                return false;
+            }
+
+            // Validasi lokal: Jangan kirim RPC jika petak belum memiliki TileKering atau sudah terisi tanaman
+            if (requireTilledSoil && LahanManagerTilemap.Instance != null)
+            {
+                if (!LahanManagerTilemap.Instance.HasTileKering(targetPosition))
+                {
+                    Debug.Log("[PlayerPlanter] Tidak bisa menanam: Petak belum dicangkul (belum ada TileKering).");
+                    return false;
+                }
+                if (LahanManagerTilemap.Instance.IsPetakDitanam(targetPosition))
+                {
+                    Debug.Log("[PlayerPlanter] Tidak bisa menanam: Petak sudah memiliki tanaman.");
+                    return false;
+                }
+            }
+
+            _lastPlantTime = Time.time;
+
+            // Putar hadap pemain ke arah petak target
+            if (_playerMovement != null)
+            {
+                _playerMovement.SetFacingDirection(targetPosition - (Vector2)transform.position);
+            }
+
+            // Picu animasi menanam
+            PlayerAnimation anim = GetComponent<PlayerAnimation>();
+            if (anim != null)
+            {
+                anim.TriggerTanamAnimation();
+            }
+
+            // Kirim permintaan ke Server (Server-Authoritative)
+            ServerPlant(targetPosition);
+            return true;
+        }
+
+        /// <summary>
+        /// Mengecek apakah petak target saat ini valid untuk ditanami benih.
+        /// </summary>
+        public bool CanPlantAt(Vector2 targetPosition)
+        {
+            if (_playerInventory == null || !_playerInventory.IsHoldingSeed) return false;
+            if (requireTilledSoil && LahanManagerTilemap.Instance != null)
+            {
+                if (!LahanManagerTilemap.Instance.HasTileKering(targetPosition)) return false;
+                if (LahanManagerTilemap.Instance.IsPetakDitanam(targetPosition)) return false;
+            }
+            if (blockedLayers.value != 0)
+            {
+                Collider2D overlap = Physics2D.OverlapCircle(targetPosition, 0.2f, blockedLayers);
+                if (overlap != null && overlap.gameObject != gameObject) return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -106,24 +184,7 @@ namespace Farming
         {
             Vector2 facingDir = _playerMovement != null ? _playerMovement.FacingDirection : Vector2.down;
             Vector2 targetPosition = GetTargetPosition(facingDir);
-
-            // Validasi lokal: Jangan kirim RPC jika petak belum memiliki TileKering atau sudah terisi tanaman
-            if (requireTilledSoil && LahanManagerTilemap.Instance != null)
-            {
-                if (!LahanManagerTilemap.Instance.HasTileKering(targetPosition))
-                {
-                    Debug.Log("[PlayerPlanter] Tidak bisa menanam: Petak belum dicangkul (belum ada TileKering).");
-                    return;
-                }
-                if (LahanManagerTilemap.Instance.IsPetakDitanam(targetPosition))
-                {
-                    Debug.Log("[PlayerPlanter] Tidak bisa menanam: Petak sudah memiliki tanaman.");
-                    return;
-                }
-            }
-
-            // Kirim permintaan ke Server (Server-Authoritative)
-            ServerPlant(targetPosition);
+            TryPlantAt(targetPosition);
         }
 
         /// <summary>

@@ -1,5 +1,10 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Scenes/MainMenu.unity.meta
 guid: 55ffc61e6fda3403293652f08936905c
+========
+guid: 541ffcf3d7a0a7f459603d14445578dd
+folderAsset: yes
+>>>>>>>> UI-Cursor-&-Placement-Indicator:Assets/SpriteSheet/Cursor.meta
 DefaultImporter:
   externalObjects: {}
   userData: 
