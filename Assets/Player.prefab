@@ -313,6 +313,8 @@ MonoBehaviour:
   alatDiTangan: 0
   reachDistance: 0.6
   showGridHighlight: 1
+  gridSortingLayerName: Tanaman
+  gridSortingOrder: 50
   highlightColorCangkul: {r: 1, g: 0.85, b: 0.2, a: 0.85}
   highlightColorSiram: {r: 0.2, g: 0.75, b: 1, a: 0.85}
   highlightColorDefault: {r: 1, g: 1, b: 1, a: 0.5}

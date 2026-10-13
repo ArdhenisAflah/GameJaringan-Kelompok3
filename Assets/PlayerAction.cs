@@ -15,6 +15,10 @@ public class PlayerAction : NetworkBehaviour
     [Header("Visual Grid Highlight")]
     [Tooltip("Menampilkan kotak highlight target di Game View.")]
     [SerializeField] private bool showGridHighlight = true;
+    [Tooltip("Sorting layer untuk visualisasi kotak grid (harus di atas layer Tanah dan Tanaman).")]
+    [SerializeField] private string gridSortingLayerName = "Tanaman";
+    [Tooltip("Order in layer untuk visualisasi kotak grid (misal: 50 agar selalu di atas tanaman yang ber-order 5).")]
+    [SerializeField] private int gridSortingOrder = 50;
     [SerializeField] private Color highlightColorCangkul = new Color(1f, 0.85f, 0.2f, 0.85f);
     [SerializeField] private Color highlightColorSiram = new Color(0.2f, 0.75f, 1f, 0.85f);
     [SerializeField] private Color highlightColorDefault = new Color(1f, 1f, 1f, 0.5f);
@@ -68,8 +72,28 @@ public class PlayerAction : NetworkBehaviour
             _gridLineRenderer.material = new Material(spriteShader);
         }
 
+        // Atur sorting layer dan order agar selalu berada di atas tanah dan tanaman
+        if (!string.IsNullOrEmpty(gridSortingLayerName))
+        {
+            _gridLineRenderer.sortingLayerName = gridSortingLayerName;
+        }
+        _gridLineRenderer.sortingOrder = gridSortingOrder;
+
         _gridLineRenderer.startColor = highlightColorDefault;
         _gridLineRenderer.endColor = highlightColorDefault;
+    }
+
+    protected override void OnValidate()
+    {
+        base.OnValidate();
+        if (_gridLineRenderer != null)
+        {
+            if (!string.IsNullOrEmpty(gridSortingLayerName))
+            {
+                _gridLineRenderer.sortingLayerName = gridSortingLayerName;
+            }
+            _gridLineRenderer.sortingOrder = gridSortingOrder;
+        }
     }
 
     private void Update()
@@ -260,12 +284,13 @@ public class PlayerAction : NetworkBehaviour
         _gridLineRenderer.startColor = activeColor;
         _gridLineRenderer.endColor = activeColor;
 
-        // Gambar 4 sudut kotak grid (ukuran 1x1 cell)
+        // Gambar 4 sudut kotak grid (ukuran 1x1 cell) dengan sedikit Z-offset ke depan kamera
         float halfSize = 0.48f;
-        _gridLineRenderer.SetPosition(0, new Vector3(center.x - halfSize, center.y - halfSize, 0f));
-        _gridLineRenderer.SetPosition(1, new Vector3(center.x + halfSize, center.y - halfSize, 0f));
-        _gridLineRenderer.SetPosition(2, new Vector3(center.x + halfSize, center.y + halfSize, 0f));
-        _gridLineRenderer.SetPosition(3, new Vector3(center.x - halfSize, center.y + halfSize, 0f));
+        float z = -0.05f;
+        _gridLineRenderer.SetPosition(0, new Vector3(center.x - halfSize, center.y - halfSize, z));
+        _gridLineRenderer.SetPosition(1, new Vector3(center.x + halfSize, center.y - halfSize, z));
+        _gridLineRenderer.SetPosition(2, new Vector3(center.x + halfSize, center.y + halfSize, z));
+        _gridLineRenderer.SetPosition(3, new Vector3(center.x - halfSize, center.y + halfSize, z));
     }
 
     private void OnDrawGizmos()
