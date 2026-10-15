@@ -187,6 +187,15 @@ public class PlayerAction : NetworkBehaviour
             }
         }
 
+        // Tekan '[' (Left Bracket) untuk MENGEMBALIKAN petak tanah ke Rumput secara dinamis
+        if (Input.GetKeyDown(KeyCode.LeftBracket))
+        {
+            if (LahanManagerTilemap.Instance != null)
+            {
+                ExecuteRestoreGrassAction(targetPos);
+            }
+        }
+
         // ==========================================
         // 2. GANTI ALAT CEPAT (Angka 1, 2, 3)
         // ==========================================
@@ -243,11 +252,23 @@ public class PlayerAction : NetworkBehaviour
     }
 
     /// <summary>
-    /// Memeriksa apakah petak target dapat dicangkul (belum dicangkul / belum berupa TileKering dan tidak ada tanaman).
+    /// Memeriksa apakah petak target dapat dicangkul (berada di rumput, bukan pohon, belum dicangkul, dan tidak ada tanaman).
     /// </summary>
     public bool CanDigAt(Vector3 targetPos)
     {
         if (LahanManagerTilemap.Instance == null) return false;
+
+        if (LahanManagerTilemap.Instance.HasTileTree(targetPos))
+        {
+            Debug.Log("<color=orange>[PlayerAction]</color> Tidak dapat mencangkul: Terdapat pohon di petak target.");
+            return false;
+        }
+
+        if (LahanManagerTilemap.Instance.tilemapGrass != null && !LahanManagerTilemap.Instance.HasTileRumput(targetPos))
+        {
+            Debug.Log("<color=orange>[PlayerAction]</color> Tidak dapat mencangkul: Petak tanah bukan area rumput.");
+            return false;
+        }
 
         // Validasi: Petak tanah belum dicangkul (belum berupa TileKering)
         if (LahanManagerTilemap.Instance.HasTileKering(targetPos))
@@ -264,6 +285,31 @@ public class PlayerAction : NetworkBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Memeriksa apakah petak target dapat dikembalikan ke rumput (harus berupa tanah dan tidak ada tanaman).
+    /// </summary>
+    public bool CanRestoreGrassAt(Vector3 targetPos)
+    {
+        if (LahanManagerTilemap.Instance == null) return false;
+        return LahanManagerTilemap.Instance.CanRestoreRumputAt(targetPos);
+    }
+
+    /// <summary>
+    /// Mengembalikan petak tanah kosong (tanpa tanaman) kembali menjadi rumput secara dinamis.
+    /// </summary>
+    private void ExecuteRestoreGrassAction(Vector3 targetPos)
+    {
+        if (_isActionLocked) return;
+
+        if (!CanRestoreGrassAt(targetPos))
+        {
+            Debug.Log("<color=orange>[PlayerAction]</color> Tidak dapat mengembalikan ke rumput: Petak bukan tanah garapan atau masih terdapat tanaman.");
+            return;
+        }
+
+        LahanManagerTilemap.Instance.MintaKembalikanRumput(targetPos);
     }
 
     /// <summary>

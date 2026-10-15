@@ -485,6 +485,31 @@ public static class LobbyUIAutoBuilder
             if (tanahLayer >= 0) tilemapBasahObj.layer = tanahLayer;
         }
 
+        GameObject tilemapGrassObj = GameObject.Find("TilemapGrass");
+        if (tilemapGrassObj == null)
+        {
+            tilemapGrassObj = new GameObject("TilemapGrass");
+            tilemapGrassObj.transform.SetParent(gridObj.transform, false);
+            tilemapGrassObj.AddComponent<Tilemap>();
+            TilemapRenderer tmr = tilemapGrassObj.AddComponent<TilemapRenderer>();
+            if (defaultSpriteMat != null) tmr.material = defaultSpriteMat;
+            tmr.sortingLayerName = "Rumput";
+            tmr.sortingOrder = 0;
+        }
+
+        GameObject tilemapTreeObj = GameObject.Find("TilemapTree");
+        if (tilemapTreeObj == null)
+        {
+            tilemapTreeObj = new GameObject("TilemapTree");
+            tilemapTreeObj.transform.SetParent(gridObj.transform, false);
+            tilemapTreeObj.AddComponent<Tilemap>();
+            TilemapRenderer tmr = tilemapTreeObj.AddComponent<TilemapRenderer>();
+            if (defaultSpriteMat != null) tmr.material = defaultSpriteMat;
+            tmr.sortingLayerName = "Pohon";
+            tmr.sortingOrder = 0;
+            tilemapTreeObj.AddComponent<TilemapCollider2D>();
+        }
+
         // 6. Ensure GameManager prefab instance exists in scene
         GameObject gameManagerObj = GameObject.Find("GameManager");
         if (gameManagerObj == null)
@@ -502,10 +527,14 @@ public static class LobbyUIAutoBuilder
             LahanManagerTilemap lmt = gameManagerObj.GetComponent<LahanManagerTilemap>();
             if (lmt != null)
             {
+                if (tilemapGrassObj != null) lmt.tilemapGrass = tilemapGrassObj.GetComponent<Tilemap>();
                 if (tilemapTanahObj != null) lmt.tilemapTanah = tilemapTanahObj.GetComponent<Tilemap>();
                 if (tilemapBasahObj != null) lmt.tilemapBasah = tilemapBasahObj.GetComponent<Tilemap>();
+                if (tilemapTreeObj != null) lmt.tilemapTree = tilemapTreeObj.GetComponent<Tilemap>();
+                if (lmt.tileRumput == null) lmt.tileRumput = AssetDatabase.LoadAssetAtPath<TileBase>("Assets/TileRumput.asset");
                 if (lmt.tileKering == null) lmt.tileKering = AssetDatabase.LoadAssetAtPath<TileBase>("Assets/TileKering.asset");
                 if (lmt.tileBasah == null) lmt.tileBasah = AssetDatabase.LoadAssetAtPath<TileBase>("Assets/TileBasah.asset");
+                if (lmt.tileTree == null) lmt.tileTree = AssetDatabase.LoadAssetAtPath<TileBase>("Assets/TileTree.asset");
                 EditorUtility.SetDirty(lmt);
             }
         }
