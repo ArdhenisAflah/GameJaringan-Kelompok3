@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Utility;
 
 namespace SiloSystem.UI
 {
@@ -43,29 +44,16 @@ namespace SiloSystem.UI
 
         public void AutoDiscoverChildReferences()
         {
-            if (itemNameText == null) itemNameText = transform.Find("NameText")?.GetComponent<TextMeshProUGUI>();
-            if (quantityText == null) quantityText = transform.Find("QuantityText")?.GetComponent<TextMeshProUGUI>();
-            if (iconImage == null) iconImage = transform.Find("IconImage")?.GetComponent<Image>();
+            // Gunakan ComponentUtility untuk pencarian deep child secara aman dan tahan perubahan hierarki
+            itemNameText   ??= transform.GetComponentInChild<TextMeshProUGUI>("NameText");
+            quantityText   ??= transform.GetComponentInChild<TextMeshProUGUI>("QuantityText");
+            iconImage      ??= transform.GetComponentInChild<Image>("IconImage");
 
-            if (pickButton == null)
-            {
-                Transform pb = transform.Find("PickButton");
-                if (pb != null)
-                {
-                    pickButton = pb.GetComponent<Button>();
-                    pickButtonText = pb.GetComponentInChildren<TextMeshProUGUI>();
-                }
-            }
+            pickButton     ??= transform.GetComponentInChild<Button>("PickButton");
+            pickButtonText ??= pickButton != null ? pickButton.GetComponentInChildren<TextMeshProUGUI>() : null;
 
-            if (depositButton == null)
-            {
-                Transform db = transform.Find("DepositButton");
-                if (db != null)
-                {
-                    depositButton = db.GetComponent<Button>();
-                    depositButtonText = db.GetComponentInChildren<TextMeshProUGUI>();
-                }
-            }
+            depositButton     ??= transform.GetComponentInChild<Button>("DepositButton");
+            depositButtonText ??= depositButton != null ? depositButton.GetComponentInChildren<TextMeshProUGUI>() : null;
         }
 
         private void OnDestroy()
