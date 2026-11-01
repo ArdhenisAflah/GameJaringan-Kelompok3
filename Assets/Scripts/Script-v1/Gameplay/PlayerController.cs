@@ -20,6 +20,7 @@ public class PlayerController : NetworkBehaviour, Farming.IWiggleTriggerSource
     private PlayerInput _playerInput;
     private Vector2 _currentMoveInput;
     private Vector2 _facingDirection = Vector2.down;
+    private bool _isFacingLeftLast;
 
     #region Event Broadcasters (Animation & Listeners)
 
@@ -147,13 +148,18 @@ public class PlayerController : NetworkBehaviour, Farming.IWiggleTriggerSource
         // Memperbarui arah hadap saat bergerak
         if (_currentMoveInput != Vector2.zero)
         {
-            Vector2 prevFacing = _facingDirection;
             _facingDirection = _currentMoveInput;
             OnFacingDirectionChanged?.Invoke(_facingDirection);
 
-            if (_facingDirection.x != 0 && Mathf.Sign(prevFacing.x) != Mathf.Sign(_facingDirection.x))
+            // Jika ada komponen horizontal (A atau D), cek apakah arah hadap horizontal berubah
+            if (Mathf.Abs(_currentMoveInput.x) > 0.01f)
             {
-                OnFacingChanged?.Invoke(_facingDirection.x < 0);
+                bool facingLeft = _currentMoveInput.x < 0f;
+                if (_isFacingLeftLast != facingLeft)
+                {
+                    _isFacingLeftLast = facingLeft;
+                    OnFacingChanged?.Invoke(facingLeft);
+                }
             }
         }
     }
