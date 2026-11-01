@@ -2,14 +2,19 @@ using UnityEngine;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 
+/// <summary>
+/// Komponen murni listener/receiver animasi karakter (Single Responsibility).
+/// Bertanggung jawab atas visual SpriteRenderer (FlipX) dan Animator parameters.
+/// Menerima sinyal event dari PlayerController (movement/facing) dan PlayerAction/PlayerPlanter
+/// tanpa membaca Input langsung secara hardcoded.
+/// </summary>
 public class PlayerAnimation : NetworkBehaviour
 {
     private Animator _animator;
     private SpriteRenderer _spriteRenderer;
-    private PlayerMovement _movement;
+    private PlayerController _controller;
     private SiloSystem.PlayerInventory _inventory;
-    
-    private Vector3 _lastPosition;
+
     private static readonly int IsWalkingHash = Animator.StringToHash("isWalking");
     private static readonly int IsTanamHash = Animator.StringToHash("isTanam");
     private static readonly int IsWateringHash = Animator.StringToHash("isWatering");
@@ -24,19 +29,16 @@ public class PlayerAnimation : NetworkBehaviour
     {
         _animator = GetComponent<Animator>();
         _spriteRenderer = GetComponent<SpriteRenderer>();
-        _movement = GetComponent<PlayerMovement>();
+        _controller = GetComponent<PlayerController>();
         _inventory = GetComponent<SiloSystem.PlayerInventory>();
     }
 
     public override void OnStartClient()
     {
         base.OnStartClient();
-        _lastPosition = transform.position;
 
-        // Listen perubahan flip saat pemain lain membalik badan
+        // 1. Sinkronisasi Remote Players (Non-Owner) via SyncVar
         _isFacingLeft.OnChange += (prev, next, asServer) => _spriteRenderer.flipX = next;
-
-        // Listen perubahan status jalan pemain lain untuk animasi mulus bebas flicker
         _isWalking.OnChange += (prev, next, asServer) =>
         {
             if (!IsOwner && _animator != null && _animator.runtimeAnimatorController != null)
@@ -51,36 +53,63 @@ public class PlayerAnimation : NetworkBehaviour
         {
             _animator.SetBool(IsWalkingHash, _isWalking.Value);
         }
+
+        // 2. Berlangganan Event dari PlayerController (Owner)
+        if (IsOwner && _controller != null)
+        {
+            _controller.OnMoveStateChanged += HandleMoveStateChanged;
+            _controller.OnFacingChanged += HandleFacingChanged;
+        }
     }
+
+    public override void OnStopClient()
+    {
+        base.OnStopClient();
+
+        // Unsubscribe untuk mencegah memory leak
+        if (_controller != null)
+        {
+            _controller.OnMoveStateChanged -= HandleMoveStateChanged;
+            _controller.OnFacingChanged -= HandleFacingChanged;
+        }
+    }
+
+    #region Event Handlers dari PlayerController
+
+    private void HandleMoveStateChanged(bool isMoving)
+    {
+        if (_animator != null && _animator.runtimeAnimatorController != null)
+        {
+            _animator.SetBool(IsWalkingHash, isMoving);
+        }
+
+        if (_isWalking.Value != isMoving)
+        {
+            ServerSetWalking(isMoving);
+        }
+    }
+
+    private void HandleFacingChanged(bool facingLeft)
+    {
+        if (_spriteRenderer != null)
+        {
+            _spriteRenderer.flipX = facingLeft;
+        }
+
+        if (_isFacingLeft.Value != facingLeft)
+        {
+            ServerSetFacing(facingLeft);
+        }
+    }
+
+    #endregion
 
     private void Update()
     {
-        if (IsOwner)
+        // Hanya untuk validasi input tanam jika ada input utility
+        if (IsOwner && _controller != null && _controller.InputSource != null)
         {
-            // Owner membaca input pergerakan
-            bool isMoving = _movement != null && _movement.IsMoving;
-
-            if (_movement != null && _movement.FacingDirection.x != 0)
-            {
-                bool facingLeft = _movement.FacingDirection.x < 0;
-                _spriteRenderer.flipX = facingLeft;
-                if (_isFacingLeft.Value != facingLeft)
-                {
-                    ServerSetFacing(facingLeft);
-                }
-            }
-
-            if (_isWalking.Value != isMoving)
-            {
-                ServerSetWalking(isMoving);
-            }
-
-            if (_animator != null && _animator.runtimeAnimatorController != null)
-            {
-                _animator.SetBool(IsWalkingHash, isMoving);
-            }
-
-            if (Input.GetKeyDown(KeyCode.E))
+            if (_controller.InputSource.IsPlantPressed)
             {
                 // Jangan picu animasi tanam jika tangan sedang membawa hasil panen (bukan benih)
                 if (_inventory == null || !_inventory.IsHoldingCrop)
@@ -89,16 +118,9 @@ public class PlayerAnimation : NetworkBehaviour
                 }
             }
         }
-        else
-        {
-            // Non-Owner mengandalkan SyncVar yang presisi dari jaringan (tanpa kalkulasi delta position yang jittery)
-            _spriteRenderer.flipX = _isFacingLeft.Value;
-            if (_animator != null && _animator.runtimeAnimatorController != null)
-            {
-                _animator.SetBool(IsWalkingHash, _isWalking.Value);
-            }
-        }
     }
+
+    #region Network Server RPCs
 
     [ServerRpc]
     private void ServerSetFacing(bool facingLeft)
@@ -111,6 +133,10 @@ public class PlayerAnimation : NetworkBehaviour
     {
         _isWalking.Value = isWalking;
     }
+
+    #endregion
+
+    #region Trigger Aksi Animasi (Tanam, Siram, Cangkul)
 
     public void TriggerTanamAnimation()
     {
@@ -204,4 +230,6 @@ public class PlayerAnimation : NetworkBehaviour
     {
         PlayDigging();
     }
+
+    #endregion
 }
