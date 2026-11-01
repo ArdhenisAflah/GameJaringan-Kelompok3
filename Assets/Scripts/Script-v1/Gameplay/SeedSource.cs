@@ -237,11 +237,11 @@ namespace Farming
 
         private static void CheckAndSpawnSource(UnityEngine.SceneManagement.Scene scene)
         {
-            if (scene.name != "SampleScene") return;
+            if (scene.name != "Gameplay") return;
 
             if (FindObjectOfType<SeedSource>() == null)
             {
-                Debug.Log("<color=green>[SeedSource]</color> Auto-generating Source Seed Padi in SampleScene at (-2, 2)...");
+                Debug.Log("<color=green>[SeedSource]</color> Auto-generating Source Seed Padi in Gameplay at (-2, 2)...");
                 CreateSeedSource(new Vector3(-2.0f, 2.0f, 0f), HarvestType.Padi, "Benih Padi");
             }
         }

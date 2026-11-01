@@ -29,7 +29,7 @@ public class lobby : MonoBehaviour
                                    && AuthenticationService.Instance.IsSignedIn;
 
     [Header("Lobby Settings")]
-    [SerializeField] private string defaultGameplayScene = "SampleScene";
+    [SerializeField] private string defaultGameplayScene = "Gameplay";
 
     // Tracks the lobby this local client/host is currently in
     private Lobby joinedLobby;

@@ -320,7 +320,7 @@ namespace TruckOrder
 
         private static void CheckAndSetupScene(UnityEngine.SceneManagement.Scene scene)
         {
-            if (scene.name != "SampleScene") return;
+            if (scene.name != "Gameplay") return;
 
             // 1. Pastikan OrderSystem ada
             if (OrderSystem.Instance == null && FindObjectOfType<OrderSystem>() == null)
@@ -335,7 +335,7 @@ namespace TruckOrder
                     GameObject osObj = new GameObject("OrderSystem");
                     osObj.AddComponent<OrderSystem>();
                 }
-                Debug.Log("<color=green>[TruckOrder]</color> Auto-created OrderSystem in SampleScene.");
+                Debug.Log("<color=green>[TruckOrder]</color> Auto-created OrderSystem in Gameplay.");
             }
 
             // 2. Pastikan TruckQueueManager ada pada 'Arah Jalan Mobil Pickup'

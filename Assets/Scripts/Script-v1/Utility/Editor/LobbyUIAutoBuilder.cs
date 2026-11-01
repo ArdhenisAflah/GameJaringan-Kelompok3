@@ -402,11 +402,11 @@ public static class LobbyUIAutoBuilder
         Debug.Log("<color=green>[LobbyUIAutoBuilder]</color> Successfully built and wired all Lobby UI elements!");
     }
 
-    [MenuItem("Tools/2. Setup Gameplay Scene (SampleScene)")]
+    [MenuItem("Tools/2. Setup Gameplay Scene (Gameplay)")]
     public static void SetupGameplayScene()
     {
-        // 1. Open SampleScene
-        var scene = EditorSceneManager.OpenScene("Assets/Scenes/SampleScene.unity");
+        // 1. Open Gameplay scene
+        var scene = EditorSceneManager.OpenScene("Assets/Scenes/Gameplay.unity");
 
         // 2. Remove dummy player in scene if present
         GameObject oldPlayer = GameObject.Find("Player");
@@ -589,9 +589,9 @@ public static class LobbyUIAutoBuilder
         }
 
         // 9. Ensure Canvas and SiloUI exist in scene
-        SetupSiloUIInSampleScene();
+        SetupSiloUIInGameplayScene();
 
-        // Save SampleScene
+        // Save Gameplay scene
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
 
@@ -601,10 +601,10 @@ public static class LobbyUIAutoBuilder
         // 6. Return back to Lobby scene
         EditorSceneManager.OpenScene("Assets/Scenes/Lobby.unity");
 
-        Debug.Log("<color=green>[LobbyUIAutoBuilder]</color> SampleScene configured for networked player spawning & Build Settings verified!");
+        Debug.Log("<color=green>[LobbyUIAutoBuilder]</color> Gameplay scene configured for networked player spawning & Build Settings verified!");
     }
 
-    private static void SetupSiloUIInSampleScene()
+    private static void SetupSiloUIInGameplayScene()
     {
         // 1. Ensure EventSystem exists
         if (Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
@@ -846,7 +846,7 @@ public static class LobbyUIAutoBuilder
         List<EditorBuildSettingsScene> scenes = new List<EditorBuildSettingsScene>
         {
             new EditorBuildSettingsScene("Assets/Scenes/Lobby.unity", true),
-            new EditorBuildSettingsScene("Assets/Scenes/SampleScene.unity", true)
+            new EditorBuildSettingsScene("Assets/Scenes/Gameplay.unity", true)
         };
 
         EditorBuildSettings.scenes = scenes.ToArray();

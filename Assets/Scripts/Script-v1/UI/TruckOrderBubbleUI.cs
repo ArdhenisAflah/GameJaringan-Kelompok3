@@ -480,7 +480,7 @@ namespace TruckOrder
 
         private static void CheckSceneAndCreateUI(UnityEngine.SceneManagement.Scene scene)
         {
-            if (scene.name != "SampleScene") return;
+            if (scene.name != "Gameplay") return;
 
             if (Instance == null && FindObjectOfType<TruckOrderBubbleUI>() == null)
             {

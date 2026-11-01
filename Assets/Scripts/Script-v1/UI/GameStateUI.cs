@@ -433,7 +433,7 @@ namespace GameManagement.UI
 
         private static void CheckSceneAndCreateUI(UnityEngine.SceneManagement.Scene scene)
         {
-            if (scene.name != "SampleScene") return;
+            if (scene.name != "Gameplay") return;
 
             if (Instance == null && FindObjectOfType<GameStateUI>() == null)
             {
