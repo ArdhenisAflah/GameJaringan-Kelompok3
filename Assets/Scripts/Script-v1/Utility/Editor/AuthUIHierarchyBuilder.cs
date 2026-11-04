@@ -212,7 +212,7 @@ namespace EdenFarm.EditorScripts
             // Tandai scene dirty dan simpan
             EditorSceneManager.MarkSceneDirty(activeScene);
             EditorSceneManager.SaveScene(activeScene);
-            Undo.CollapseUndoGroup(undoGroup);
+            Undo.CollapseUndoOperations(undoGroup);
 
             Debug.Log("<color=green><b>[AuthUIHierarchyBuilder]</b> Berhasil membuat hierarki Auth Canvas dan Panel UI di Hierarchy!</color>");
         }
