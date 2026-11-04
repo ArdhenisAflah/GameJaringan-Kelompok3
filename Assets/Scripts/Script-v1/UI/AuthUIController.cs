@@ -2,6 +2,9 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using EdenFarm.Auth.DTO;
+using EdenFarm.Auth.Session;
+using EdenFarm.Auth.Networking;
 
 namespace EdenFarm.Auth.UI
 {
@@ -71,21 +74,27 @@ namespace EdenFarm.Auth.UI
 
         /// <summary>
         /// Mendeteksi apakah player sudah pernah login sebelumnya (player lama)
-        /// atau belum pernah ada data tersimpan (player baru), lalu menampilkan form yang tepat.
+        /// atau belum pernah ada data tersimpan (player baru), lalu menjalankan Auto-Login jika token ada.
         /// </summary>
         public void DetectPlayerStatusAndSetInitialState()
         {
-            bool hasSavedAccount = PlayerPrefs.HasKey("AUTH_TOKEN") || PlayerPrefs.HasKey("SAVED_USERNAME");
-
-            if (hasSavedAccount)
+            string lastUsername = SessionManager.GetLastUsername();
+            if (loginUsernameInput != null && !string.IsNullOrEmpty(lastUsername))
             {
-                string savedUser = PlayerPrefs.GetString("SAVED_USERNAME", string.Empty);
-                if (loginUsernameInput != null && !string.IsNullOrEmpty(savedUser))
+                loginUsernameInput.text = lastUsername;
+            }
+
+            if (SessionManager.HasSavedSession())
+            {
+                SetAuthState(AuthState.Login);
+                var savedSession = SessionManager.GetCurrentSession();
+                if (savedSession != null && !string.IsNullOrEmpty(savedSession.token))
                 {
-                    loginUsernameInput.text = savedUser;
+                    // Lakukan Auto-Login via endpoint /api/auth/verify
+                    AttemptAutoLogin(savedSession.token);
+                    return;
                 }
 
-                SetAuthState(AuthState.Login);
                 ShowStatusMessage("Selamat datang kembali! Silakan masuk ke akun Anda.");
             }
             else
@@ -93,6 +102,28 @@ namespace EdenFarm.Auth.UI
                 SetAuthState(AuthState.Register);
                 ShowStatusMessage("Selamat datang di Eden Farm! Silakan daftarkan akun baru Anda.");
             }
+        }
+
+        private void AttemptAutoLogin(string token)
+        {
+            SetInputInteractable(false);
+            ShowStatusMessage("<color=yellow>Menghubungkan & memverifikasi sesi tersimpan...</color>");
+
+            EnsureNetworkClient();
+            AuthNetworkClient.Instance.SendVerifySession(token, (response) =>
+            {
+                SetInputInteractable(true);
+                // Perbarui sesi dengan data terbaru dari server
+                SessionManager.SaveSession(token, response.userId, response.data);
+                ShowStatusMessage($"<color=green>Sesi aktif! Selamat datang kembali, {response.data.nickname}!</color>");
+                OnAuthSuccessNavigateToLobby();
+            }, (errorMsg) =>
+            {
+                SetInputInteractable(true);
+                // Token tidak valid atau expired di server -> bersihkan sesi lokal
+                SessionManager.ClearSession();
+                ShowStatusMessage($"<color=orange>{errorMsg}</color>");
+            });
         }
 
         /// <summary>
@@ -147,7 +178,24 @@ namespace EdenFarm.Auth.UI
                 return;
             }
 
+            SetInputInteractable(false);
             ShowStatusMessage($"<color=yellow>Memverifikasi akun {username}...</color>");
+
+            EnsureNetworkClient();
+            var req = new LoginRequestDTO(username, password);
+
+            AuthNetworkClient.Instance.SendLogin(req, (response) =>
+            {
+                SetInputInteractable(true);
+                // Simpan token sesi dan data akun ke penyimpanan lokal perangkat
+                SessionManager.SaveSession(response.token, response.userId, response.data);
+                ShowStatusMessage($"<color=green>Login berhasil! Selamat datang, {response.data.nickname}!</color>");
+                OnAuthSuccessNavigateToLobby();
+            }, (errorMsg) =>
+            {
+                SetInputInteractable(true);
+                ShowStatusMessage($"<color=red>{errorMsg}</color>");
+            });
         }
 
         private void OnRegisterSubmitClicked()
@@ -169,7 +217,89 @@ namespace EdenFarm.Auth.UI
                 return;
             }
 
-            ShowStatusMessage($"<color=yellow>Mendaftarkan akun {username}...</color>");
+            SetInputInteractable(false);
+            ShowStatusMessage($"<color=yellow>Mendaftarkan akun {username} ke server...</color>");
+
+            EnsureNetworkClient();
+            var req = new RegisterRequestDTO(username, password, nickname, birthDate);
+
+            AuthNetworkClient.Instance.SendRegister(req, (response) =>
+            {
+                ShowStatusMessage("<color=green>Akun berhasil didaftarkan! Mengalihkan ke login...</color>");
+
+                // Lakukan auto-login langsung dengan kredensial yang baru didaftarkan
+                var loginReq = new LoginRequestDTO(username, password);
+                AuthNetworkClient.Instance.SendLogin(loginReq, (loginRes) =>
+                {
+                    SetInputInteractable(true);
+                    SessionManager.SaveSession(loginRes.token, loginRes.userId, loginRes.data);
+                    ShowStatusMessage($"<color=green>Selamat datang di Eden Farm, {loginRes.data.nickname}!</color>");
+                    OnAuthSuccessNavigateToLobby();
+                }, (loginErr) =>
+                {
+                    SetInputInteractable(true);
+                    // Jika auto-login gagal, arahkan player ke form login biasa
+                    SetAuthState(AuthState.Login);
+                    if (loginUsernameInput != null) loginUsernameInput.text = username;
+                    ShowStatusMessage("<color=green>Akun terdaftar!</color> Silakan masuk.");
+                });
+            }, (errorMsg) =>
+            {
+                SetInputInteractable(true);
+                ShowStatusMessage($"<color=red>{errorMsg}</color>");
+            });
+        }
+
+        private void SetInputInteractable(bool interactable)
+        {
+            if (loginSubmitButton != null) loginSubmitButton.interactable = interactable;
+            if (registerSubmitButton != null) registerSubmitButton.interactable = interactable;
+            if (switchToRegisterButton != null) switchToRegisterButton.interactable = interactable;
+            if (switchToLoginButton != null) switchToLoginButton.interactable = interactable;
+            if (loginUsernameInput != null) loginUsernameInput.interactable = interactable;
+            if (loginPasswordInput != null) loginPasswordInput.interactable = interactable;
+            if (registerUsernameInput != null) registerUsernameInput.interactable = interactable;
+            if (registerPasswordInput != null) registerPasswordInput.interactable = interactable;
+            if (registerNicknameInput != null) registerNicknameInput.interactable = interactable;
+            if (registerBirthDateInput != null) registerBirthDateInput.interactable = interactable;
+        }
+
+        private void OnAuthSuccessNavigateToLobby()
+        {
+            StartCoroutine(NavigateToLobbyRoutine());
+        }
+
+        private System.Collections.IEnumerator NavigateToLobbyRoutine()
+        {
+            yield return new WaitForSeconds(1.0f);
+
+            // Buka scene Lobby jika tersedia di Build Settings
+            if (UnityEngine.SceneManagement.SceneUtility.GetBuildIndexByScenePath("Lobby") >= 0 ||
+                UnityEngine.SceneManagement.SceneUtility.GetBuildIndexByScenePath("Assets/Scenes/Lobby.unity") >= 0)
+            {
+                UnityEngine.SceneManagement.SceneManager.LoadScene("Lobby");
+            }
+            else
+            {
+                // Fallback direct load
+                try
+                {
+                    UnityEngine.SceneManagement.SceneManager.LoadScene("Lobby");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[AuthUIController] Tidak dapat memuat scene Lobby: {e.Message}");
+                }
+            }
+        }
+
+        private void EnsureNetworkClient()
+        {
+            if (AuthNetworkClient.Instance == null)
+            {
+                GameObject clientGo = new GameObject("AuthNetworkClient");
+                clientGo.AddComponent<AuthNetworkClient>();
+            }
         }
 
         public void ShowStatusMessage(string message)
