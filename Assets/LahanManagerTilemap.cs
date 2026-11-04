@@ -150,6 +150,13 @@ public class LahanManagerTilemap : NetworkBehaviour
         SetTilemapSorting(tilemapTanah, tanahSortingLayerName, tanahSortingOrder);
         SetTilemapSorting(tilemapBasah, basahSortingLayerName, basahSortingOrder);
         SetTilemapSorting(tilemapTree, treeSortingLayerName, treeSortingOrder);
+
+        // Pastikan TilemapTrackRoad (jalan mobil) selalu di layer Tanah (order 1), bukan di layer Pohon
+        GameObject trackRoadObj = GameObject.Find("TilemapTrackRoad");
+        if (trackRoadObj != null)
+        {
+            SetTilemapSorting(trackRoadObj.GetComponent<Tilemap>(), tanahSortingLayerName, 1);
+        }
     }
 
     private void SetTilemapSorting(Tilemap tm, string layerName, int order)
