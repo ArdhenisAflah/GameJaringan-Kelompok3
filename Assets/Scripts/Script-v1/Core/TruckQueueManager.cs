@@ -27,11 +27,20 @@ namespace TruckOrder
         [Tooltip("Titik awal spawn mobil.")]
         [SerializeField] private Transform spawnPoint;
 
-        [Tooltip("Slot antrean berderet. Index 0 adalah Loading Spot (terdepan), index 1 dan seterusnya di belakang.")]
-        [SerializeField] private Transform[] queueSlots;
+        [Tooltip("Daftar waypoint lintasan kedatangan dari spawn sampai loading spot.")]
+        [SerializeField] private List<Transform> arrivingWaypoints = new List<Transform>();
+
+        [Tooltip("Titik loading spot tempat truk parkir dan menerima pesanan.")]
+        [SerializeField] private Transform loadingSpot;
+
+        [Tooltip("Daftar waypoint lintasan keberangkatan dari loading spot sampai titik exit.")]
+        [SerializeField] private List<Transform> departingWaypoints = new List<Transform>();
 
         [Tooltip("Titik akhir keluar lintasan untuk destroy mobil.")]
         [SerializeField] private Transform exitPoint;
+
+        [Tooltip("Slot antrean berderet. Index 0 adalah Loading Spot (terdepan), index 1 dan seterusnya di belakang.")]
+        [SerializeField] private Transform[] queueSlots;
 
         [Header("Pengaturan Antrean")]
         [Tooltip("Jumlah maksimal slot antrean berderet.")]
@@ -48,6 +57,7 @@ namespace TruckOrder
 
         public int CurrentQueueCount => _trucksInQueue.Count;
         public TruckController ActiveTruck => _trucksInQueue.Count > 0 ? _trucksInQueue[0] : null;
+        public Transform LoadingSpot => loadingSpot != null ? loadingSpot : (queueSlots != null && queueSlots.Length > 0 ? queueSlots[0] : null);
 
         private void Awake()
         {
@@ -62,6 +72,14 @@ namespace TruckOrder
             }
 
             ResolveWaypointsIfNeeded();
+        }
+
+        private void OnValidate()
+        {
+            if (spawnPoint == null || arrivingWaypoints == null || arrivingWaypoints.Count == 0 || exitPoint == null)
+            {
+                ResolveWaypointsIfNeeded();
+            }
         }
 
         private void Start()
@@ -86,40 +104,76 @@ namespace TruckOrder
         /// </summary>
         public void ResolveWaypointsIfNeeded()
         {
-            if (spawnPoint != null && queueSlots != null && queueSlots.Length > 0 && exitPoint != null) return;
+            if (spawnPoint != null && arrivingWaypoints != null && arrivingWaypoints.Count > 0 
+                && departingWaypoints != null && departingWaypoints.Count > 0 && exitPoint != null 
+                && queueSlots != null && queueSlots.Length > 0)
+            {
+                return;
+            }
 
             GameObject roadParent = GameObject.Find("Arah Jalan Mobil Pickup");
             if (roadParent != null)
             {
-                Transform spawn = roadParent.transform.Find(" mulai (instantiate mobil )");
-                Transform slot0 = roadParent.transform.Find("stop (load order ke sistem order)");
-                Transform slot2 = roadParent.transform.Find("jalan ke sini - 1");
-                Transform exit = roadParent.transform.Find("berakhir stop (destroy disini)");
+                Transform road = roadParent.transform;
+                int childCount = road.childCount;
 
-                if (spawnPoint == null && spawn != null) spawnPoint = spawn;
-                if (exitPoint == null && exit != null) exitPoint = exit;
+                int spawnIdx = -1;
+                int stopIdx = -1;
+                int exitIdx = -1;
 
-                if (queueSlots == null || queueSlots.Length == 0)
+                for (int i = 0; i < childCount; i++)
                 {
-                    List<Transform> slots = new List<Transform>();
-                    if (slot0 != null) slots.Add(slot0); // Loading spot
-
-                    // Buat / cari slot 1 di tengah antara slot 0 dan slot 2
-                    Transform slot1 = roadParent.transform.Find("queue_slot_1");
-                    if (slot1 == null && slot0 != null && slot2 != null)
+                    string n = road.GetChild(i).name.Trim().ToLowerInvariant();
+                    if (spawnIdx == -1 && (n.Contains("mulai") || n.Contains("spawn") || n.Contains("instantiate")))
                     {
-                        GameObject s1Obj = new GameObject("queue_slot_1");
-                        s1Obj.transform.SetParent(roadParent.transform, false);
-                        s1Obj.transform.position = Vector3.Lerp(slot0.position, slot2.position, 0.5f);
-                        slot1 = s1Obj.transform;
+                        spawnIdx = i;
                     }
-                    if (slot1 != null) slots.Add(slot1);
-                    if (slot2 != null) slots.Add(slot2);
-
-                    queueSlots = slots.ToArray();
+                    else if (n.Contains("stop") && (n.Contains("load") || n.Contains("order")))
+                    {
+                        stopIdx = i;
+                    }
+                    else if (n.Contains("berakhir") || n.Contains("destroy") || n.Contains("exit"))
+                    {
+                        exitIdx = i;
+                    }
                 }
 
-                Debug.Log($"<color=cyan>[TruckQueueManager]</color> Berhasil memetakan {queueSlots.Length} slot antrean dan titik lintasan dari '{roadParent.name}'.");
+                // Fallbacks jika nama spesifik tidak ditemukan
+                if (spawnIdx == -1 && childCount > 0) spawnIdx = 0;
+                if (stopIdx == -1 && childCount > 1) stopIdx = childCount / 2;
+                if (exitIdx == -1 && childCount > 0) exitIdx = childCount - 1;
+
+                if (spawnIdx != -1 && stopIdx != -1 && exitIdx != -1)
+                {
+                    spawnPoint = road.GetChild(spawnIdx);
+                    loadingSpot = road.GetChild(stopIdx);
+                    exitPoint = road.GetChild(exitIdx);
+
+                    arrivingWaypoints.Clear();
+                    for (int i = spawnIdx + 1; i <= stopIdx; i++)
+                    {
+                        arrivingWaypoints.Add(road.GetChild(i));
+                    }
+
+                    departingWaypoints.Clear();
+                    for (int i = stopIdx + 1; i <= exitIdx; i++)
+                    {
+                        departingWaypoints.Add(road.GetChild(i));
+                    }
+
+                    List<Transform> slots = new List<Transform>();
+                    for (int s = 0; s < maxQueueSlots; s++)
+                    {
+                        int arriveIdx = arrivingWaypoints.Count - 1 - s;
+                        if (arriveIdx >= 0)
+                        {
+                            slots.Add(arrivingWaypoints[arriveIdx]);
+                        }
+                    }
+                    queueSlots = slots.ToArray();
+
+                    Debug.Log($"<color=cyan>[TruckQueueManager]</color> Berhasil memetakan {arrivingWaypoints.Count} arriving waypoints, {departingWaypoints.Count} departing waypoints, dan {queueSlots.Length} slot antrean dari '{roadParent.name}'.");
+                }
             }
         }
 
@@ -130,17 +184,16 @@ namespace TruckOrder
         {
             if (_trucksInQueue.Count >= maxQueueSlots) return null;
 
-            Vector3 spawnPos = spawnPoint != null ? spawnPoint.position : new Vector3(5.35f, 5.61f, 0f);
+            Vector3 spawnPos = spawnPoint != null ? spawnPoint.position : new Vector3(56.68f, 24.39f, 0f);
             spawnPos.z = 0f;
 
-            Vector3 exitPos = exitPoint != null ? exitPoint.position : new Vector3(5.35f, -12.34f, 0f);
+            Vector3 exitPos = exitPoint != null ? exitPoint.position : new Vector3(25.5f, -36.22f, 0f);
             exitPos.z = 0f;
 
             GameObject truckObj;
             if (truckPrefab != null)
             {
-                // Rotasi 180 derajat agar kabin menghadap ke bawah (searah lintasan sumbu -Y)
-                truckObj = Instantiate(truckPrefab, spawnPos, Quaternion.Euler(0f, 0f, 180f));
+                truckObj = Instantiate(truckPrefab, spawnPos, Quaternion.identity);
             }
             else
             {
@@ -161,13 +214,52 @@ namespace TruckOrder
 
             truck.Initialize(this, exitPos);
 
+            // Pasang rute keluar jika tersedia
+            if (departingWaypoints != null && departingWaypoints.Count > 0)
+            {
+                List<Vector3> exitPoints = new List<Vector3>();
+                for (int i = 0; i < departingWaypoints.Count; i++)
+                {
+                    if (departingWaypoints[i] != null)
+                    {
+                        exitPoints.Add(departingWaypoints[i].position);
+                    }
+                }
+                truck.SetExitPath(exitPoints);
+            }
+
             int targetSlotIndex = _trucksInQueue.Count;
             _trucksInQueue.Add(truck);
 
-            Vector3 targetPos = GetSlotPosition(targetSlotIndex);
-            targetPos.z = 0f;
             bool isLoadingSpot = (targetSlotIndex == 0);
-            truck.AssignTargetSlot(targetPos, isLoadingSpot);
+
+            // Tentukan sliced arrival path menuju slot antrean
+            if (arrivingWaypoints != null && arrivingWaypoints.Count > 0)
+            {
+                int targetWaypointIdx = Mathf.Max(0, arrivingWaypoints.Count - 1 - targetSlotIndex);
+                List<Vector3> initialPath = new List<Vector3>();
+                for (int i = 0; i <= targetWaypointIdx; i++)
+                {
+                    if (arrivingWaypoints[i] != null)
+                    {
+                        initialPath.Add(arrivingWaypoints[i].position);
+                    }
+                }
+
+                // Arahkan orientasi truk seketika menghadap waypoint pertama
+                if (initialPath.Count > 0)
+                {
+                    truck.SnapRotationToHeading(initialPath[0]);
+                }
+
+                truck.SetPath(initialPath, isLoadingSpot);
+            }
+            else
+            {
+                Vector3 targetPos = GetSlotPosition(targetSlotIndex);
+                truck.SnapRotationToHeading(targetPos);
+                truck.AssignTargetSlot(targetPos, isLoadingSpot);
+            }
 
             return truck;
         }
@@ -177,19 +269,51 @@ namespace TruckOrder
         /// </summary>
         public void OnActiveTruckLeft()
         {
+            TruckController departingTruck = null;
             if (_trucksInQueue.Count > 0)
             {
-                // Hapus truk terdepan dari daftar antrean
+                departingTruck = _trucksInQueue[0];
                 _trucksInQueue.RemoveAt(0);
+            }
+
+            // Pastikan rute keluar terpasang pada truk yang meninggalkan loading spot
+            if (departingTruck != null && departingWaypoints != null && departingWaypoints.Count > 0)
+            {
+                List<Vector3> exitPoints = new List<Vector3>();
+                for (int i = 0; i < departingWaypoints.Count; i++)
+                {
+                    if (departingWaypoints[i] != null)
+                    {
+                        exitPoints.Add(departingWaypoints[i].position);
+                    }
+                }
+                departingTruck.SetExitPath(exitPoints);
             }
 
             // Majukan semua truk di belakangnya satu slot ke depan
             for (int i = 0; i < _trucksInQueue.Count; i++)
             {
-                Vector3 newSlotPos = GetSlotPosition(i);
-                newSlotPos.z = 0f;
                 bool isNewLoadingSpot = (i == 0);
-                _trucksInQueue[i].AssignTargetSlot(newSlotPos, isNewLoadingSpot);
+
+                if (arrivingWaypoints != null && arrivingWaypoints.Count > 0)
+                {
+                    int newTargetWpIdx = arrivingWaypoints.Count - 1 - i;
+                    if (newTargetWpIdx >= 0 && newTargetWpIdx < arrivingWaypoints.Count && arrivingWaypoints[newTargetWpIdx] != null)
+                    {
+                        List<Vector3> additional = new List<Vector3> { arrivingWaypoints[newTargetWpIdx].position };
+                        _trucksInQueue[i].ExtendPath(additional, isNewLoadingSpot);
+                    }
+                    else
+                    {
+                        Vector3 newSlotPos = GetSlotPosition(i);
+                        _trucksInQueue[i].AssignTargetSlot(newSlotPos, isNewLoadingSpot);
+                    }
+                }
+                else
+                {
+                    Vector3 newSlotPos = GetSlotPosition(i);
+                    _trucksInQueue[i].AssignTargetSlot(newSlotPos, isNewLoadingSpot);
+                }
             }
 
             // Jadwalkan spawn truk baru di belakang antrean untuk menjaga slot penuh
@@ -218,6 +342,11 @@ namespace TruckOrder
             {
                 pos = queueSlots[slotIndex].position;
             }
+            else if (arrivingWaypoints != null && arrivingWaypoints.Count > 0)
+            {
+                int arriveIdx = Mathf.Max(0, arrivingWaypoints.Count - 1 - slotIndex);
+                pos = arrivingWaypoints[arriveIdx].position;
+            }
             else
             {
                 // Fallback kalkulasi koordinat berderet di sepanjang x = 5.35
@@ -234,7 +363,7 @@ namespace TruckOrder
             pos.z = 0f;
             GameObject obj = new GameObject("Truck_Runtime");
             obj.transform.position = pos;
-            obj.transform.rotation = Quaternion.Euler(0f, 0f, 180f);
+            obj.transform.rotation = Quaternion.identity;
 
             SpriteRenderer sr = obj.AddComponent<SpriteRenderer>();
             sr.sortingLayerName = "Karakter";
@@ -284,13 +413,45 @@ namespace TruckOrder
                 Gizmos.DrawWireSphere(spawnPoint.position, 0.4f);
             }
 
+            // Gambar garis lintasan kedatangan
+            if (arrivingWaypoints != null && arrivingWaypoints.Count > 0)
+            {
+                Gizmos.color = Color.cyan;
+                Vector3 prev = spawnPoint != null ? spawnPoint.position : arrivingWaypoints[0].position;
+                for (int i = 0; i < arrivingWaypoints.Count; i++)
+                {
+                    if (arrivingWaypoints[i] == null) continue;
+                    Gizmos.DrawLine(prev, arrivingWaypoints[i].position);
+                    Gizmos.DrawWireSphere(arrivingWaypoints[i].position, 0.2f);
+                    prev = arrivingWaypoints[i].position;
+                }
+            }
+
+            // Gambar slot antrean
             if (queueSlots != null)
             {
                 for (int i = 0; i < queueSlots.Length; i++)
                 {
                     if (queueSlots[i] == null) continue;
-                    Gizmos.color = (i == 0) ? Color.yellow : Color.cyan;
+                    Gizmos.color = (i == 0) ? Color.yellow : new Color(0f, 0.8f, 1f, 0.7f);
                     Gizmos.DrawWireCube(queueSlots[i].position, new Vector3(1.2f, 1.8f, 0f));
+                }
+            }
+
+            // Gambar garis lintasan keberangkatan
+            if (departingWaypoints != null && departingWaypoints.Count > 0)
+            {
+                Gizmos.color = Color.magenta;
+                Vector3 prev = (loadingSpot != null)
+                    ? loadingSpot.position
+                    : (queueSlots != null && queueSlots.Length > 0 && queueSlots[0] != null ? queueSlots[0].position : departingWaypoints[0].position);
+
+                for (int i = 0; i < departingWaypoints.Count; i++)
+                {
+                    if (departingWaypoints[i] == null) continue;
+                    Gizmos.DrawLine(prev, departingWaypoints[i].position);
+                    Gizmos.DrawWireSphere(departingWaypoints[i].position, 0.2f);
+                    prev = departingWaypoints[i].position;
                 }
             }
 
@@ -340,11 +501,16 @@ namespace TruckOrder
 
             // 2. Pastikan TruckQueueManager ada pada 'Arah Jalan Mobil Pickup'
             GameObject roadParent = GameObject.Find("Arah Jalan Mobil Pickup");
-            if (roadParent != null && roadParent.GetComponent<TruckQueueManager>() == null)
+            TruckQueueManager qm = null;
+            if (roadParent != null)
             {
-                var qm = roadParent.AddComponent<TruckQueueManager>();
-                qm.ResolveWaypointsIfNeeded();
-                Debug.Log("<color=green>[TruckOrder]</color> Auto-attached TruckQueueManager to 'Arah Jalan Mobil Pickup'.");
+                qm = roadParent.GetComponent<TruckQueueManager>();
+                if (qm == null)
+                {
+                    qm = roadParent.AddComponent<TruckQueueManager>();
+                    qm.ResolveWaypointsIfNeeded();
+                    Debug.Log("<color=green>[TruckOrder]</color> Auto-attached TruckQueueManager to 'Arah Jalan Mobil Pickup'.");
+                }
             }
 
             // 3. Pastikan TruckOrderBubbleUI Canvas UI ada
@@ -357,9 +523,13 @@ namespace TruckOrder
             if (FindObjectOfType<TruckInteraction>() == null)
             {
                 GameObject interactionObj = new GameObject("TruckInteraction");
-                interactionObj.transform.position = new Vector3(5.35f, -2.13f, 0f);
+                Vector3 loadingPos = (qm != null && qm.LoadingSpot != null)
+                    ? qm.LoadingSpot.position
+                    : new Vector3(5.35f, -2.13f, 0f);
+                loadingPos.z = 0f;
+                interactionObj.transform.position = loadingPos;
                 interactionObj.AddComponent<TruckInteraction>();
-                Debug.Log("<color=green>[TruckOrder]</color> Auto-created TruckInteraction for loading spot.");
+                Debug.Log($"<color=green>[TruckOrder]</color> Auto-created TruckInteraction for loading spot at {loadingPos}.");
             }
         }
     }
