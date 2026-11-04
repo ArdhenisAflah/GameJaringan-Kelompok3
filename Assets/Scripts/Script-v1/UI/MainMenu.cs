@@ -15,6 +15,9 @@ public class MainMenu : MonoBehaviour
     }
 
     [Header("Pengaturan Scene")]
+    [Tooltip("Nama scene autentikasi login/register (tujuan berikutnya dari MainMenu)")]
+    public string namaSceneAuth = "Auth";
+
     [Tooltip("Ketik nama scene lobby kamu secara persis (huruf besar/kecil berpengaruh)")]
     public string namaSceneLobby = "Lobby";
 
@@ -290,13 +293,27 @@ public class MainMenu : MonoBehaviour
     }
 
     // ==========================================
-    // Navigasi Scene (Mempertahankan fungsi tombol UI)
+    // Navigasi Scene (Flow: MainMenu -> Auth -> Lobby -> Gameplay)
     // ==========================================
 
+    /// <summary>
+    /// Berpindah ke scene Auth (Login / Registrasi / Auto-Login).
+    /// </summary>
+    public void MoveToAuth()
+    {
+        string targetScene = !string.IsNullOrEmpty(namaSceneAuth) ? namaSceneAuth : "Auth";
+        Debug.Log("[MainMenu] Berpindah ke scene Auth: " + targetScene);
+        SceneManager.LoadScene(targetScene);
+    }
+
+    /// <summary>
+    /// Dipanggil dari tombol Play/Lobby di Main Menu.
+    /// Mengarahkan alur pemain ke Auth terlebih dahulu sesuai flow arsitektur.
+    /// </summary>
     public void MoveToLobby()
     {
-        Debug.Log("Berpindah ke scene: " + namaSceneLobby);
-        SceneManager.LoadScene(namaSceneLobby);
+        // Alur resmi: MainMenu -> Auth -> Lobby
+        MoveToAuth();
     }
 
     public void QuitGame()
