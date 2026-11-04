@@ -132,6 +132,12 @@ public class LobbyUI : MonoBehaviour
         if (lobbyBrowserPanel != null) lobbyBrowserPanel.SetActive(true);
         if (insideRoomPanel != null) insideRoomPanel.SetActive(false);
 
+        // Pastikan panel Leaderboard berdampingan aktif di browser view
+        if (EdenFarm.Score.UI.LeaderboardUIController.Instance != null)
+        {
+            EdenFarm.Score.UI.LeaderboardUIController.Instance.SetPanelVisible(true);
+        }
+
         RefreshLobbyList();
     }
 
@@ -139,6 +145,12 @@ public class LobbyUI : MonoBehaviour
     {
         if (lobbyBrowserPanel != null) lobbyBrowserPanel.SetActive(false);
         if (insideRoomPanel != null) insideRoomPanel.SetActive(true);
+
+        // Sembunyikan leaderboard saat sudah masuk room agar fokus pada ruang tunggu
+        if (EdenFarm.Score.UI.LeaderboardUIController.Instance != null)
+        {
+            EdenFarm.Score.UI.LeaderboardUIController.Instance.SetPanelVisible(false);
+        }
 
         if (roomTitleText != null) roomTitleText.text = roomName;
         if (lobbyCodeText != null)
