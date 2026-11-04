@@ -33,6 +33,11 @@ namespace Farming
         [Tooltip("Tombol interaksi untuk mengambil benih.")]
         [SerializeField] private KeyCode pickKey = KeyCode.F;
 
+        [Header("Sorting Layer")]
+        [Tooltip("Sorting layer agar Seed Box dan teksnya selalu terlihat di atas rumput dan tanah.")]
+        [SerializeField] private string sortingLayerName = "Tanaman";
+        [SerializeField] private int spriteSortingOrder = 10;
+
         [Header("Visual Prompt")]
         [Tooltip("Tampilkan prompt teks mengambang saat pemain mendekat.")]
         [SerializeField] private bool showPrompt = true;
@@ -50,7 +55,42 @@ namespace Farming
 
         private void Awake()
         {
+            ApplySortingToRenderer();
             SetupPromptVisual();
+        }
+
+        private void Start()
+        {
+            ApplySortingToRenderer();
+        }
+
+        public void ApplySortingToRenderer()
+        {
+            var sr = GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                if (!string.IsNullOrEmpty(sortingLayerName))
+                {
+                    sr.sortingLayerName = sortingLayerName;
+                }
+                sr.sortingOrder = spriteSortingOrder;
+            }
+
+            // Atur juga NameTag jika ada
+            Transform tagTrans = transform.Find("NameTag");
+            if (tagTrans != null)
+            {
+                var tagTmp = tagTrans.GetComponent<TMPro.TextMeshPro>();
+                if (tagTmp != null)
+                {
+                    if (!string.IsNullOrEmpty(sortingLayerName))
+                    {
+                        var mr = tagTrans.GetComponent<MeshRenderer>();
+                        if (mr != null) mr.sortingLayerName = sortingLayerName;
+                    }
+                    tagTmp.sortingOrder = spriteSortingOrder + 5;
+                }
+            }
         }
 
         private void Update()
@@ -83,6 +123,12 @@ namespace Farming
             _promptText.fontSize = 2.4f;
             _promptText.alignment = TMPro.TextAlignmentOptions.Center;
             _promptText.color = new Color(1f, 0.95f, 0.4f, 1f);
+            var promptMr = _promptObj.GetComponent<MeshRenderer>();
+            if (promptMr != null)
+            {
+                promptMr.sortingLayerName = "Karakter";
+            }
+            _promptText.sortingLayerID = SortingLayer.NameToID("Karakter");
             _promptText.sortingOrder = 30;
             _promptText.text = $"[{pickKey}] Ambil {seedName}";
 
@@ -251,9 +297,10 @@ namespace Farming
             GameObject obj = new GameObject($"SeedSource_{type}");
             obj.transform.position = worldPos;
 
-            // Visual Sprite
+            // Visual Sprite (Sorting Layer Tanaman, Order 10)
             SpriteRenderer sr = obj.AddComponent<SpriteRenderer>();
             sr.sprite = GetDefaultBoxSprite();
+            sr.sortingLayerName = "Tanaman";
             sr.sortingOrder = 10;
 
             // 2D Physics Collider
@@ -265,6 +312,8 @@ namespace Farming
             SeedSource source = obj.AddComponent<SeedSource>();
             source.seedType = type;
             source.seedName = name;
+            source.sortingLayerName = "Tanaman";
+            source.spriteSortingOrder = 10;
             source.infiniteSupply = true;
             source.interactionRadius = 2.2f;
 
@@ -272,12 +321,22 @@ namespace Farming
             GameObject tagObj = new GameObject("NameTag");
             tagObj.transform.SetParent(obj.transform, false);
             tagObj.transform.localPosition = new Vector3(0f, 0.75f, 0f);
+            var tagMr = tagObj.AddComponent<MeshRenderer>();
+            tagMr.sortingLayerName = "Tanaman";
             var tagText = tagObj.AddComponent<TMPro.TextMeshPro>();
             tagText.text = $"Kotak {name}";
             tagText.fontSize = 2.2f;
             tagText.alignment = TMPro.TextAlignmentOptions.Center;
             tagText.color = new Color(0.85f, 1f, 0.75f, 1f);
+            tagText.sortingLayerID = SortingLayer.NameToID("Tanaman");
             tagText.sortingOrder = 28;
+
+            // Parent under --- SPAWNER --- jika ada
+            GameObject spawnerHeader = GameObject.Find("--- SPAWNER ---");
+            if (spawnerHeader != null)
+            {
+                obj.transform.SetParent(spawnerHeader.transform, true);
+            }
 
             return obj;
         }

@@ -29,8 +29,11 @@ namespace Farming
         [Tooltip("Waktu dalam detik untuk naik ke tahap pertumbuhan berikutnya (di server).")]
         [SerializeField] private float timePerStage = 10f;
 
-        [Header("Visual")]
+        [Header("Visual & Sorting")]
         [SerializeField] private SpriteRenderer spriteRenderer;
+        [Tooltip("Sorting layer agar tanaman selalu berada di atas tanah dan rumput.")]
+        [SerializeField] private string sortingLayerName = "Tanaman";
+        [SerializeField] private int sortingOrder = 5;
         [SerializeField] private Sprite[] stageSprites;
 
         /// <summary>
@@ -88,7 +91,26 @@ namespace Farming
                 spriteRenderer = GetComponentInChildren<SpriteRenderer>();
             }
 
+            ApplySortingSettings();
             _growthStage.OnChange += OnGrowthStageChanged;
+        }
+
+        private void Start()
+        {
+            ApplySortingSettings();
+            UpdateVisuals(_growthStage.Value);
+        }
+
+        public void ApplySortingSettings()
+        {
+            if (spriteRenderer != null)
+            {
+                if (!string.IsNullOrEmpty(sortingLayerName))
+                {
+                    spriteRenderer.sortingLayerName = sortingLayerName;
+                }
+                spriteRenderer.sortingOrder = sortingOrder;
+            }
         }
 
         private void OnDestroy()

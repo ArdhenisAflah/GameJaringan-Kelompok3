@@ -90,12 +90,13 @@ namespace SiloSystem
             _anchorObj.transform.localRotation = Quaternion.identity;
             _anchorObj.transform.localScale = new Vector3(0.85f, 0.85f, 1f);
 
-            // Sprite Renderer
+            // Sprite Renderer (Sorting Layer Karakter, Order 25)
             _itemSpriteRenderer = _anchorObj.GetComponent<SpriteRenderer>();
             if (_itemSpriteRenderer == null)
             {
                 _itemSpriteRenderer = _anchorObj.AddComponent<SpriteRenderer>();
             }
+            _itemSpriteRenderer.sortingLayerName = "Karakter";
             _itemSpriteRenderer.sortingOrder = 25; // Di atas kepala player
 
             // TextMeshPro Quantity Tag (Kecil di samping ikon)
@@ -112,6 +113,10 @@ namespace SiloSystem
             }
 
             textObj.transform.localPosition = new Vector3(0.35f, -0.1f, 0f);
+            var mr = textObj.GetComponent<MeshRenderer>();
+            if (mr == null) mr = textObj.AddComponent<MeshRenderer>();
+            mr.sortingLayerName = "Karakter";
+
             _quantityText = textObj.GetComponent<TextMeshPro>();
             if (_quantityText == null)
             {
@@ -120,6 +125,7 @@ namespace SiloSystem
             _quantityText.fontSize = 2.5f;
             _quantityText.alignment = TextAlignmentOptions.Left;
             _quantityText.color = new Color(1f, 0.95f, 0.4f, 1f);
+            _quantityText.sortingLayerID = SortingLayer.NameToID("Karakter");
             _quantityText.sortingOrder = 26;
 
             _anchorObj.SetActive(false);
@@ -145,7 +151,7 @@ namespace SiloSystem
             _anchorObj.SetActive(true);
 
             // Tentukan Sprite dari item database atau fallback visual
-            Sprite cropSprite = GetSpriteForType(type);
+            Sprite cropSprite = GetSpriteForType(type, category);
             if (_itemSpriteRenderer != null)
             {
                 _itemSpriteRenderer.sprite = cropSprite;
@@ -158,7 +164,7 @@ namespace SiloSystem
                 }
                 else
                 {
-                    _itemSpriteRenderer.color = category == ItemCategory.Seed ? new Color(0.8f, 1f, 0.8f, 1f) : Color.white;
+                    _itemSpriteRenderer.color = Color.white;
                 }
             }
 
@@ -200,7 +206,7 @@ namespace SiloSystem
             }
         }
 
-        private Sprite GetSpriteForType(HarvestType type)
+        private Sprite GetSpriteForType(HarvestType type, ItemCategory category = ItemCategory.Crop)
         {
             for (int i = 0; i < itemDatabase.Count; i++)
             {
@@ -211,17 +217,38 @@ namespace SiloSystem
             }
 
 #if UNITY_EDITOR
-            // Fallback Editor: ambil sprite matang dari SpriteSheet/Padi_animated-Sheet jika Padi
+            // Fallback Editor: ambil sprite dari SpriteSheet/Padi_animated-Sheet jika Padi
             if (type == HarvestType.Padi)
             {
                 string path = "Assets/SpriteSheet/Padi_animated-Sheet.png";
                 var assets = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path);
+                if (category == ItemCategory.Seed)
+                {
+                    // Untuk benih (bibit), ambil tahap awal (Padi_animated-Sheet_0)
+                    for (int i = 0; i < assets.Length; i++)
+                    {
+                        if (assets[i] is Sprite s && s.name.EndsWith("_0"))
+                        {
+                            return s;
+                        }
+                    }
+                }
+                else
+                {
+                    // Untuk hasil panen matang, ambil tahap akhir (Padi_animated-Sheet_2)
+                    for (int i = 0; i < assets.Length; i++)
+                    {
+                        if (assets[i] is Sprite s && (s.name.EndsWith("_2") || s.name.Contains("3")))
+                        {
+                            return s;
+                        }
+                    }
+                }
+
+                // Fallback sprite apapun dari sheet
                 for (int i = 0; i < assets.Length; i++)
                 {
-                    if (assets[i] is Sprite s && (s.name.Contains("3") || s.name.Contains("2")))
-                    {
-                        return s;
-                    }
+                    if (assets[i] is Sprite s) return s;
                 }
             }
 #endif
