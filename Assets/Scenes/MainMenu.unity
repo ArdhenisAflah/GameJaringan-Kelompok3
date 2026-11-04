@@ -3496,6 +3496,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8508a79b09814958b9c02dde82a336e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  namaSceneAuth: Auth
   namaSceneLobby: Lobby
   introContainer: {fileID: 863997847}
   logoCanvasGroup: {fileID: 480149074}
