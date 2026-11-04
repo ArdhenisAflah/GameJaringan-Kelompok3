@@ -23,6 +23,7 @@ public class LobbyUI : MonoBehaviour
     [SerializeField] private Transform lobbyListContainer; // Parent with VerticalLayoutGroup
     [SerializeField] private LobbyItemCard lobbyCardPrefab; // The Card prefab
     [SerializeField] private Button refreshListButton;
+    [SerializeField] private Button openLeaderboardButton;
 
     [Header("Inside Room UI")]
     [SerializeField] private TextMeshProUGUI roomTitleText;
@@ -56,6 +57,9 @@ public class LobbyUI : MonoBehaviour
         if (refreshListButton != null)
             refreshListButton.onClick.AddListener(RefreshLobbyList);
 
+        if (openLeaderboardButton != null)
+            openLeaderboardButton.onClick.AddListener(OnOpenLeaderboardClicked);
+
         if (startGameButton != null)
             startGameButton.onClick.AddListener(OnStartGameClicked);
 
@@ -85,11 +89,26 @@ public class LobbyUI : MonoBehaviour
         if (refreshListButton != null)
             refreshListButton.onClick.RemoveListener(RefreshLobbyList);
 
+        if (openLeaderboardButton != null)
+            openLeaderboardButton.onClick.RemoveListener(OnOpenLeaderboardClicked);
+
         if (startGameButton != null)
             startGameButton.onClick.RemoveListener(OnStartGameClicked);
 
         if (leaveRoomButton != null)
             leaveRoomButton.onClick.RemoveListener(OnLeaveRoomClicked);
+    }
+
+    private void OnOpenLeaderboardClicked()
+    {
+        if (EdenFarm.Score.UI.LeaderboardUIController.Instance != null)
+        {
+            EdenFarm.Score.UI.LeaderboardUIController.Instance.OpenModal();
+        }
+        else
+        {
+            Debug.LogWarning("[LobbyUI] LeaderboardUIController tidak ditemukan di scene Lobby!");
+        }
     }
 
     private void OnUserAuthenticated()
