@@ -15,7 +15,9 @@ namespace EdenFarm.EditorScripts
     /// </summary>
     public static class AuthUIHierarchyBuilder
     {
+        [MenuItem("Tools/Build Auth UI Hierarchy %#b")] // Shortcut: Ctrl+Shift+B (atau Cmd+Shift+B)
         [MenuItem("Tools/Eden Farm/Build Auth UI Hierarchy")]
+        [MenuItem("GameObject/Eden Farm/Build Auth UI Hierarchy", false, 10)]
         public static void BuildAuthUIHierarchy()
         {
             // 1. Pastikan scene Auth aktif atau buka dialog konfirmasi
