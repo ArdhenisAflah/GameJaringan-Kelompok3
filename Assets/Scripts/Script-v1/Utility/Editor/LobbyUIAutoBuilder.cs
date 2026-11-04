@@ -70,6 +70,10 @@ public static class LobbyUIAutoBuilder
         Transform looseCard = canvas.transform.Find("Card Lobby");
         if (looseCard != null) Object.DestroyImmediate(looseCard.gameObject);
 
+        // Remove old legacy Scroll View that caused the vertical dark strip overlay
+        Transform legacyScrollView = canvas.transform.Find("Scroll View");
+        if (legacyScrollView != null) Object.DestroyImmediate(legacyScrollView.gameObject);
+
         // ==========================================
         // 3. CREATE LOBBY BROWSER PANEL (SEBELAH KIRI)
         // ==========================================
@@ -79,8 +83,8 @@ public static class LobbyUIAutoBuilder
         bpRect.anchorMin = new Vector2(0.5f, 0.5f);
         bpRect.anchorMax = new Vector2(0.5f, 0.5f);
         bpRect.pivot = new Vector2(0.5f, 0.5f);
-        bpRect.anchoredPosition = new Vector2(-280, 0); // Bergeser ke kiri
-        bpRect.sizeDelta = new Vector2(1050, 680);
+        bpRect.anchoredPosition = new Vector2(-280, 0); // Posisi rapi di kiri
+        bpRect.sizeDelta = new Vector2(1040, 680);
 
         Image bpImage = browserPanel.AddComponent<Image>();
         bpImage.sprite = tmpResources.background;
@@ -299,8 +303,8 @@ public static class LobbyUIAutoBuilder
         lbRect.anchorMin = new Vector2(0.5f, 0.5f);
         lbRect.anchorMax = new Vector2(0.5f, 0.5f);
         lbRect.pivot = new Vector2(0.5f, 0.5f);
-        lbRect.anchoredPosition = new Vector2(510, 0); // Berdampingan di sebelah kanan Lobby
-        lbRect.sizeDelta = new Vector2(480, 680);
+        lbRect.anchoredPosition = new Vector2(530, 0); // Berdampingan di sebelah kanan Lobby (ada gap 50px bersih)
+        lbRect.sizeDelta = new Vector2(500, 680);
 
         Image lbImage = leaderboardPanel.AddComponent<Image>();
         lbImage.sprite = tmpResources.background;
