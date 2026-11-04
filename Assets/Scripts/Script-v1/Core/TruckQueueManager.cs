@@ -366,7 +366,7 @@ namespace TruckOrder
             obj.transform.rotation = Quaternion.identity;
 
             SpriteRenderer sr = obj.AddComponent<SpriteRenderer>();
-            sr.sortingLayerName = "Karakter";
+            sr.sortingLayerName = "Truck";
             sr.sortingOrder = 5;
 
             // Load sprite dari mobilPickup-Sheet jika ada

@@ -58,8 +58,8 @@ namespace TruckOrder
         [Header("Sprites & Sorting")]
         [SerializeField] private SpriteRenderer spriteRenderer;
 
-        [Tooltip("Sorting layer untuk memastikan truk berada di atas layer tanah dan tanaman.")]
-        [SerializeField] private string sortingLayerName = "Karakter";
+        [Tooltip("Sorting layer untuk memastikan truk berada di atas tanah & rumput, namun di bawah / belakang layer pohon.")]
+        [SerializeField] private string sortingLayerName = "Truck";
 
         [Tooltip("Sorting order pada layer Karakter.")]
         [SerializeField] private int sortingOrder = 5;
