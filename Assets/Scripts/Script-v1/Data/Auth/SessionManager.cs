@@ -16,6 +16,7 @@ namespace EdenFarm.Auth.Session
         public string nickname;
         public string rank;
         public int tierLevel;
+        public int highestScore;
         public long savedTimestamp;
 
         public bool IsValid => !string.IsNullOrEmpty(token) && userId > 0;
@@ -33,6 +34,7 @@ namespace EdenFarm.Auth.Session
         private const string PREF_KEY_NICKNAME = "EDEN_FARM_NICKNAME";
         private const string PREF_KEY_RANK = "EDEN_FARM_RANK";
         private const string PREF_KEY_TIER = "EDEN_FARM_TIER";
+        private const string PREF_KEY_HIGH_SCORE = "EDEN_FARM_HIGH_SCORE";
         private const string PREF_KEY_TIMESTAMP = "EDEN_FARM_SESSION_TIME";
 
         // Fallback backward compatibility keys
@@ -70,6 +72,7 @@ namespace EdenFarm.Auth.Session
                 nickname = PlayerPrefs.GetString(PREF_KEY_NICKNAME, string.Empty),
                 rank = PlayerPrefs.GetString(PREF_KEY_RANK, "Novice Planter"),
                 tierLevel = PlayerPrefs.GetInt(PREF_KEY_TIER, 1),
+                highestScore = PlayerPrefs.GetInt(PREF_KEY_HIGH_SCORE, 0),
                 savedTimestamp = long.TryParse(PlayerPrefs.GetString(PREF_KEY_TIMESTAMP, "0"), out long ts) ? ts : 0
             };
 
@@ -104,6 +107,7 @@ namespace EdenFarm.Auth.Session
             string nickname = data != null ? data.nickname : username;
             string rank = data != null ? data.rank : "Novice Planter";
             int tier = data != null ? data.tierLevel : 1;
+            int highScore = (data != null && data.stats != null) ? data.stats.highestScore : PlayerPrefs.GetInt(PREF_KEY_HIGH_SCORE, 0);
 
             if (!string.IsNullOrEmpty(username))
             {
@@ -118,6 +122,7 @@ namespace EdenFarm.Auth.Session
 
             PlayerPrefs.SetString(PREF_KEY_RANK, rank);
             PlayerPrefs.SetInt(PREF_KEY_TIER, tier);
+            PlayerPrefs.SetInt(PREF_KEY_HIGH_SCORE, highScore);
 
             PlayerPrefs.Save();
 
@@ -129,10 +134,33 @@ namespace EdenFarm.Auth.Session
                 nickname = nickname,
                 rank = rank,
                 tierLevel = tier,
+                highestScore = highScore,
                 savedTimestamp = currentEpoch
             };
 
             Debug.Log($"<color=green>[SessionManager] Sesi tersimpan untuk pemain: {username} (ID: {userId})</color>");
+        }
+
+        /// <summary>
+        /// Memperbarui skor tertinggi pemain secara lokal.
+        /// </summary>
+        public static void UpdateHighScore(int newHighScore)
+        {
+            int currentBest = PlayerPrefs.GetInt(PREF_KEY_HIGH_SCORE, 0);
+            if (newHighScore > currentBest)
+            {
+                PlayerPrefs.SetInt(PREF_KEY_HIGH_SCORE, newHighScore);
+                PlayerPrefs.Save();
+                if (_cachedSession != null)
+                {
+                    _cachedSession.highestScore = newHighScore;
+                }
+            }
+        }
+
+        public static int GetPersonalHighScore()
+        {
+            return PlayerPrefs.GetInt(PREF_KEY_HIGH_SCORE, 0);
         }
 
         /// <summary>

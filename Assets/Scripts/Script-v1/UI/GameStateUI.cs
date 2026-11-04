@@ -24,6 +24,8 @@ namespace GameManagement.UI
         [Header("Game Over UI Elements")]
         [SerializeField] private Image gameOverImage;
         [SerializeField] private TextMeshProUGUI gameOverReasonText;
+        [SerializeField] private TextMeshProUGUI matchScoreText;
+        [SerializeField] private TextMeshProUGUI personalHighScoreText;
         [SerializeField] private TextMeshProUGUI gameOverCountdownText;
 
         [Header("Victory UI Elements")]
@@ -127,6 +129,32 @@ namespace GameManagement.UI
                     gameOverReasonText.text = msg;
                 }
 
+                // Ambil Match Score dan Personal High Score
+                int currentMatchScore = 0;
+                if (EdenFarm.Score.Gameplay.MatchScoreTracker.Instance != null)
+                {
+                    currentMatchScore = EdenFarm.Score.Gameplay.MatchScoreTracker.Instance.MatchScore;
+                    // Kirim skor match ke backend secara otomatis
+                    EdenFarm.Score.Gameplay.MatchScoreTracker.Instance.SubmitMatchScore();
+                }
+
+                int prevHighScore = EdenFarm.Auth.Session.SessionManager.GetPersonalHighScore();
+                if (currentMatchScore > prevHighScore)
+                {
+                    EdenFarm.Auth.Session.SessionManager.UpdateHighScore(currentMatchScore);
+                }
+                int personalHighScore = EdenFarm.Auth.Session.SessionManager.GetPersonalHighScore();
+
+                if (matchScoreText != null)
+                {
+                    matchScoreText.text = $"Skor Match Ini: <color=#FFD700><b>{currentMatchScore} Poin</b></color>";
+                }
+
+                if (personalHighScoreText != null)
+                {
+                    personalHighScoreText.text = $"Skor Tertinggi Saya: <color=#00E5FF><b>{personalHighScore} Poin</b></color>";
+                }
+
                 if (gameOverCountdownText != null)
                 {
                     float delay = GameStateManager.Instance != null ? GameStateManager.Instance.ShutdownDelay : 5f;
@@ -194,6 +222,8 @@ namespace GameManagement.UI
             {
                 if (gameOverImage == null) gameOverImage = gameOverPanel.transform.Find("GameOverImage")?.GetComponent<Image>();
                 if (gameOverReasonText == null) gameOverReasonText = gameOverPanel.transform.Find("ReasonText")?.GetComponent<TextMeshProUGUI>();
+                if (matchScoreText == null) matchScoreText = gameOverPanel.transform.Find("MatchScoreText")?.GetComponent<TextMeshProUGUI>();
+                if (personalHighScoreText == null) personalHighScoreText = gameOverPanel.transform.Find("PersonalHighScoreText")?.GetComponent<TextMeshProUGUI>();
                 if (gameOverCountdownText == null) gameOverCountdownText = gameOverPanel.transform.Find("CountdownText")?.GetComponent<TextMeshProUGUI>();
             }
 
@@ -319,8 +349,8 @@ namespace GameManagement.UI
             goReasonRect.anchorMin = new Vector2(0.5f, 0.5f);
             goReasonRect.anchorMax = new Vector2(0.5f, 0.5f);
             goReasonRect.pivot = new Vector2(0.5f, 0.5f);
-            goReasonRect.anchoredPosition = new Vector2(0f, -130f);
-            goReasonRect.sizeDelta = new Vector2(800f, 50f);
+            goReasonRect.anchoredPosition = new Vector2(0f, -100f);
+            goReasonRect.sizeDelta = new Vector2(800f, 40f);
 
             TextMeshProUGUI goReasonTmp = goReasonObj.AddComponent<TextMeshProUGUI>();
             goReasonTmp.text = "Batas Pesanan Gagal Terlampaui (3/3)!";
@@ -329,19 +359,51 @@ namespace GameManagement.UI
             goReasonTmp.alignment = TextAlignmentOptions.Center;
             goReasonTmp.color = new Color(1f, 0.75f, 0.2f, 1f);
 
-            // Child 4c: Countdown Text
+            // Child 4c: Match Score Text
+            GameObject goMatchScoreObj = new GameObject("MatchScoreText");
+            goMatchScoreObj.transform.SetParent(goPanelObj.transform, false);
+            RectTransform goMatchScoreRect = goMatchScoreObj.AddComponent<RectTransform>();
+            goMatchScoreRect.anchorMin = new Vector2(0.5f, 0.5f);
+            goMatchScoreRect.anchorMax = new Vector2(0.5f, 0.5f);
+            goMatchScoreRect.pivot = new Vector2(0.5f, 0.5f);
+            goMatchScoreRect.anchoredPosition = new Vector2(0f, -140f);
+            goMatchScoreRect.sizeDelta = new Vector2(800f, 36f);
+
+            TextMeshProUGUI goMatchScoreTmp = goMatchScoreObj.AddComponent<TextMeshProUGUI>();
+            goMatchScoreTmp.text = "Skor Match Ini: <color=#FFD700><b>0 Poin</b></color>";
+            goMatchScoreTmp.fontSize = 22;
+            goMatchScoreTmp.alignment = TextAlignmentOptions.Center;
+            goMatchScoreTmp.color = Color.white;
+
+            // Child 4d: Personal High Score Text
+            GameObject goHighScoreObj = new GameObject("PersonalHighScoreText");
+            goHighScoreObj.transform.SetParent(goPanelObj.transform, false);
+            RectTransform goHighScoreRect = goHighScoreObj.AddComponent<RectTransform>();
+            goHighScoreRect.anchorMin = new Vector2(0.5f, 0.5f);
+            goHighScoreRect.anchorMax = new Vector2(0.5f, 0.5f);
+            goHighScoreRect.pivot = new Vector2(0.5f, 0.5f);
+            goHighScoreRect.anchoredPosition = new Vector2(0f, -180f);
+            goHighScoreRect.sizeDelta = new Vector2(800f, 36f);
+
+            TextMeshProUGUI goHighScoreTmp = goHighScoreObj.AddComponent<TextMeshProUGUI>();
+            goHighScoreTmp.text = "Skor Tertinggi Saya: <color=#00E5FF><b>0 Poin</b></color>";
+            goHighScoreTmp.fontSize = 22;
+            goHighScoreTmp.alignment = TextAlignmentOptions.Center;
+            goHighScoreTmp.color = Color.white;
+
+            // Child 4e: Countdown Text
             GameObject goCountObj = new GameObject("CountdownText");
             goCountObj.transform.SetParent(goPanelObj.transform, false);
             RectTransform goCountRect = goCountObj.AddComponent<RectTransform>();
             goCountRect.anchorMin = new Vector2(0.5f, 0.5f);
             goCountRect.anchorMax = new Vector2(0.5f, 0.5f);
             goCountRect.pivot = new Vector2(0.5f, 0.5f);
-            goCountRect.anchoredPosition = new Vector2(0f, -180f);
-            goCountRect.sizeDelta = new Vector2(800f, 40f);
+            goCountRect.anchoredPosition = new Vector2(0f, -225f);
+            goCountRect.sizeDelta = new Vector2(800f, 36f);
 
             TextMeshProUGUI goCountTmp = goCountObj.AddComponent<TextMeshProUGUI>();
             goCountTmp.text = "Kembali ke Lobby dalam 5 detik...";
-            goCountTmp.fontSize = 20;
+            goCountTmp.fontSize = 18;
             goCountTmp.alignment = TextAlignmentOptions.Center;
             goCountTmp.color = new Color(0.9f, 0.9f, 0.9f, 0.9f);
 
@@ -396,6 +458,8 @@ namespace GameManagement.UI
 
             ui.gameOverImage = goImg;
             ui.gameOverReasonText = goReasonTmp;
+            ui.matchScoreText = goMatchScoreTmp;
+            ui.personalHighScoreText = goHighScoreTmp;
             ui.gameOverCountdownText = goCountTmp;
 
             ui.victoryImage = winImg;
