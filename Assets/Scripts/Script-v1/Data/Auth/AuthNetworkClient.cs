@@ -130,6 +130,8 @@ namespace EdenFarm.Auth.Networking
 
         private IEnumerator PostJsonRoutine(string url, string jsonBody, string bearerToken, Action<string> onSuccess, Action<string> onFailure)
         {
+            Debug.Log($"<color=#00E5FF>[AuthNetworkClient] [REQ-POST]</color> Sending request to: <b>{url}</b>\n<color=#B0BEC5>Payload:</color> {(url.Contains("/login") || url.Contains("/register") ? "***[CREDENTIALS PROTECTED]***" : jsonBody)}");
+
             using (UnityWebRequest request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST))
             {
                 byte[] rawPayload = Encoding.UTF8.GetBytes(jsonBody);
@@ -151,6 +153,8 @@ namespace EdenFarm.Auth.Networking
 
         private IEnumerator GetJsonRoutine(string url, string bearerToken, Action<string> onSuccess, Action<string> onFailure)
         {
+            Debug.Log($"<color=#00E5FF>[AuthNetworkClient] [REQ-GET]</color> Sending request to: <b>{url}</b>");
+
             using (UnityWebRequest request = UnityWebRequest.Get(url))
             {
                 request.downloadHandler = new DownloadHandlerBuffer();
@@ -170,9 +174,16 @@ namespace EdenFarm.Auth.Networking
         private void HandleApiResponse(UnityWebRequest request, Action<string> onSuccess, Action<string> onFailure)
         {
             string responseText = request.downloadHandler?.text;
+            long statusCode = request.responseCode;
+            string url = request.url;
 
             if (request.result == UnityWebRequest.Result.Success)
             {
+                string preview = !string.IsNullOrEmpty(responseText) && responseText.Length > 200 
+                    ? responseText.Substring(0, 200) + "..." 
+                    : responseText;
+                Debug.Log($"<color=#00FF7F>[AuthNetworkClient] [RES-OK {statusCode}]</color> <b>{url}</b>\n<color=#E0E0E0>{preview}</color>");
+
                 onSuccess?.Invoke(responseText);
                 return;
             }
@@ -208,7 +219,7 @@ namespace EdenFarm.Auth.Networking
                 }
             }
 
-            Debug.LogWarning($"[AuthNetworkClient] Error {request.responseCode}: {errorMessage}");
+            Debug.LogWarning($"<color=#FF5252>[AuthNetworkClient] [RES-FAIL {statusCode}]</color> <b>{url}</b>\n<color=#FFCDD2>Error:</color> {errorMessage}\n<color=#B0BEC5>Raw:</color> {responseText}");
             onFailure?.Invoke(errorMessage);
         }
     }
