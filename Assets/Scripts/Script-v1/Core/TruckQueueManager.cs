@@ -17,6 +17,9 @@ namespace TruckOrder
         [Tooltip("Prefab Truk dengan komponen TruckController.")]
         [SerializeField] private GameObject truckPrefab;
 
+        [Tooltip("Transform container di hierarki untuk menampung truk yang di-spawn (opsional, jika null akan mencari [Trucks_Container]).")]
+        [SerializeField] private Transform truckContainer;
+
         [Tooltip("Sprite truk kosong bawaan.")]
         [SerializeField] private Sprite defaultEmptySprite;
 
@@ -199,6 +202,21 @@ namespace TruckOrder
             {
                 // Fallback runtime generator jika prefab belum di-assign di Inspector
                 truckObj = CreateRuntimeTruckObject(spawnPos);
+            }
+
+            // Atur parenting agar rapi dan terlihat di hierarki di bawah folder yang sesuai
+            if (truckContainer == null)
+            {
+                GameObject containerGo = GameObject.Find("[Trucks_Container]");
+                if (containerGo != null)
+                {
+                    truckContainer = containerGo.transform;
+                }
+            }
+
+            if (truckContainer != null)
+            {
+                truckObj.transform.SetParent(truckContainer, true);
             }
 
             TruckController truck = truckObj.GetComponent<TruckController>();
@@ -483,6 +501,9 @@ namespace TruckOrder
         {
             if (scene.name != "Gameplay") return;
 
+            GameObject managersHeader = GameObject.Find("--- MANAGERS ---");
+            GameObject spawnerHeader = GameObject.Find("--- SPAWNER ---");
+
             // 1. Pastikan OrderSystem ada
             if (OrderSystem.Instance == null && FindObjectOfType<OrderSystem>() == null)
             {
@@ -494,6 +515,10 @@ namespace TruckOrder
                 else
                 {
                     GameObject osObj = new GameObject("OrderSystem");
+                    if (managersHeader != null)
+                    {
+                        osObj.transform.SetParent(managersHeader.transform, false);
+                    }
                     osObj.AddComponent<OrderSystem>();
                 }
                 Debug.Log("<color=green>[TruckOrder]</color> Auto-created OrderSystem in Gameplay.");
@@ -504,12 +529,30 @@ namespace TruckOrder
             TruckQueueManager qm = null;
             if (roadParent != null)
             {
+                if (spawnerHeader != null && roadParent.transform.parent != spawnerHeader.transform)
+                {
+                    roadParent.transform.SetParent(spawnerHeader.transform, true);
+                }
+
                 qm = roadParent.GetComponent<TruckQueueManager>();
                 if (qm == null)
                 {
                     qm = roadParent.AddComponent<TruckQueueManager>();
                     qm.ResolveWaypointsIfNeeded();
                     Debug.Log("<color=green>[TruckOrder]</color> Auto-attached TruckQueueManager to 'Arah Jalan Mobil Pickup'.");
+                }
+
+                // Pastikan [Trucks_Container] ada
+                Transform containerTrans = roadParent.transform.Find("[Trucks_Container]");
+                if (containerTrans == null)
+                {
+                    GameObject containerGo = new GameObject("[Trucks_Container]");
+                    containerGo.transform.SetParent(roadParent.transform, false);
+                    containerTrans = containerGo.transform;
+                }
+                if (qm.truckContainer == null)
+                {
+                    qm.truckContainer = containerTrans;
                 }
             }
 
@@ -528,6 +571,10 @@ namespace TruckOrder
                     : new Vector3(5.35f, -2.13f, 0f);
                 loadingPos.z = 0f;
                 interactionObj.transform.position = loadingPos;
+                if (spawnerHeader != null)
+                {
+                    interactionObj.transform.SetParent(spawnerHeader.transform, false);
+                }
                 interactionObj.AddComponent<TruckInteraction>();
                 Debug.Log($"<color=green>[TruckOrder]</color> Auto-created TruckInteraction for loading spot at {loadingPos}.");
             }
