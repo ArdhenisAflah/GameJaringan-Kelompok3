@@ -10,28 +10,28 @@ using EdenFarm.Score.Networking;
 namespace EdenFarm.Score.UI
 {
     /// <summary>
-    /// Controller UI Leaderboard & Statistik Pemain di Scene Lobby.
-    /// Mengikuti kaidah Canvas Controller: Controller Canvas tetap aktif, hanya child panel
-    /// (modalRoot) yang di-toggle SetActive(true/false).
+    /// Controller UI Panel Leaderboard & Statistik Pemain di Scene Lobby.
+    /// Tampil langsung sebagai panel berdampingan dengan Lobby Browser Panel (bukan pop-up modal).
+    /// Otomatis mengonsumsi REST API Node.js backend saat scene Lobby dimuat atau saat tombol refresh ditekan.
     /// </summary>
     public class LeaderboardUIController : MonoBehaviour
     {
         public static LeaderboardUIController Instance { get; private set; }
 
-        [Header("Modal Popup Panel (Child)")]
-        [Tooltip("Root GameObject dari modal popup (di-toggle SetActive)")]
-        [SerializeField] private GameObject modalPopupRoot;
-        [SerializeField] private Button closeButton;
+        [Header("Main Panel Root")]
+        [Tooltip("Root GameObject panel leaderboard (selalu aktif berdampingan dengan Lobby)")]
+        [SerializeField] private GameObject panelRoot;
 
         [Header("Tab Controls")]
         [SerializeField] private Button tabLeaderboardButton;
         [SerializeField] private Button tabMyStatsButton;
+        [SerializeField] private Button refreshButton;
         [SerializeField] private GameObject leaderboardContainer;
         [SerializeField] private GameObject myStatsContainer;
 
         [Header("Leaderboard List View")]
         [SerializeField] private Transform leaderboardContentList;
-        [SerializeField] private GameObject leaderboardRowPrefab; // Optional prefab fallback
+        [SerializeField] private GameObject leaderboardRowPrefab; // Optional prefab
         [SerializeField] private TextMeshProUGUI leaderboardStatusText;
 
         [Header("My Stats Text Fields")]
@@ -42,6 +42,9 @@ namespace EdenFarm.Score.UI
         [SerializeField] private TextMeshProUGUI statOrdersCompletedText;
         [SerializeField] private TextMeshProUGUI statMatchesPlayedText;
         [SerializeField] private Transform recentMatchesContentList;
+
+        private enum TabMode { Leaderboard, MyStats }
+        private TabMode _currentTab = TabMode.Leaderboard;
 
         private void Awake()
         {
@@ -55,53 +58,89 @@ namespace EdenFarm.Score.UI
                 return;
             }
 
-            // Default: Modal tertutup saat scene dimuat
-            if (modalPopupRoot != null)
+            if (panelRoot == null)
             {
-                modalPopupRoot.SetActive(false);
+                panelRoot = gameObject;
             }
+
+            AutoDiscoverReferences();
         }
 
         private void Start()
         {
-            if (closeButton != null) closeButton.onClick.AddListener(CloseModal);
             if (tabLeaderboardButton != null) tabLeaderboardButton.onClick.AddListener(ShowLeaderboardTab);
             if (tabMyStatsButton != null) tabMyStatsButton.onClick.AddListener(ShowMyStatsTab);
-        }
+            if (refreshButton != null) refreshButton.onClick.AddListener(RefreshCurrentTab);
 
-        public void OpenModal()
-        {
-            if (modalPopupRoot != null) modalPopupRoot.SetActive(true);
+            // Buka tab default dan muat data dari API backend
             ShowLeaderboardTab();
         }
 
-        public void CloseModal()
+        public void SetPanelVisible(bool visible)
         {
-            if (modalPopupRoot != null) modalPopupRoot.SetActive(false);
+            if (panelRoot != null)
+            {
+                panelRoot.SetActive(visible);
+            }
+        }
+
+        public void RefreshCurrentTab()
+        {
+            if (_currentTab == TabMode.Leaderboard)
+            {
+                FetchLeaderboardData();
+            }
+            else
+            {
+                FetchMyStatsData();
+            }
         }
 
         public void ShowLeaderboardTab()
         {
+            _currentTab = TabMode.Leaderboard;
+
             if (leaderboardContainer != null) leaderboardContainer.SetActive(true);
             if (myStatsContainer != null) myStatsContainer.SetActive(false);
 
+            UpdateTabButtonVisuals(tabLeaderboardButton, tabMyStatsButton);
             FetchLeaderboardData();
         }
 
         public void ShowMyStatsTab()
         {
+            _currentTab = TabMode.MyStats;
+
             if (leaderboardContainer != null) leaderboardContainer.SetActive(false);
             if (myStatsContainer != null) myStatsContainer.SetActive(true);
 
+            UpdateTabButtonVisuals(tabMyStatsButton, tabLeaderboardButton);
             FetchMyStatsData();
         }
 
-        private void FetchLeaderboardData()
+        private void UpdateTabButtonVisuals(Button activeBtn, Button inactiveBtn)
+        {
+            if (activeBtn != null)
+            {
+                var img = activeBtn.GetComponent<Image>();
+                if (img != null) img.color = new Color(0.2f, 0.45f, 0.8f, 1f);
+            }
+            if (inactiveBtn != null)
+            {
+                var img = inactiveBtn.GetComponent<Image>();
+                if (img != null) img.color = new Color(0.18f, 0.22f, 0.32f, 1f);
+            }
+        }
+
+        /// <summary>
+        /// Mengonsumsi GET /api/leaderboard dari backend server Node.js.
+        /// </summary>
+        public void FetchLeaderboardData()
         {
             if (leaderboardStatusText != null)
             {
                 leaderboardStatusText.gameObject.SetActive(true);
-                leaderboardStatusText.text = "Memuat data papan peringkat...";
+                leaderboardStatusText.text = "Memuat leaderboard dari server...";
             }
 
             EnsureScoreNetworkClient();
@@ -134,7 +173,7 @@ namespace EdenFarm.Score.UI
                 if (leaderboardStatusText != null)
                 {
                     leaderboardStatusText.gameObject.SetActive(true);
-                    leaderboardStatusText.text = "Belum ada catatan skor tercatat.";
+                    leaderboardStatusText.text = "Belum ada pemain di papan peringkat.";
                 }
                 return;
             }
@@ -150,17 +189,20 @@ namespace EdenFarm.Score.UI
                 }
                 else
                 {
-                    // Fallback runtime text jika prefab belum dislot di inspector
                     rowGo = new GameObject($"Row_{entry.position}", typeof(RectTransform));
                     rowGo.transform.SetParent(leaderboardContentList, false);
+                    var layout = rowGo.AddComponent<LayoutElement>();
+                    layout.minHeight = 44;
+                    layout.preferredHeight = 44;
+
                     var txt = rowGo.AddComponent<TextMeshProUGUI>();
-                    txt.fontSize = 20;
-                    txt.color = (i == 0) ? Color.yellow : Color.white;
-                    txt.text = $"#{entry.position}  <b>{entry.nickname}</b>  -  {entry.score} Poin  ({entry.rank})";
+                    txt.fontSize = 18;
+                    txt.color = (i == 0) ? new Color(1f, 0.85f, 0.2f) : (i == 1) ? new Color(0.85f, 0.85f, 0.9f) : (i == 2) ? new Color(0.8f, 0.5f, 0.2f) : Color.white;
+                    txt.alignment = TextAlignmentOptions.MidlineLeft;
+                    txt.text = $"<b>#{entry.position}</b>  {entry.nickname}  <color=#88ccff>({entry.score} pts)</color>  <size=14><color=#aaaaaa>[{entry.rank}]</color></size>";
                     continue;
                 }
 
-                // Jika prefab memiliki TextMeshProUGUI
                 var label = rowGo.GetComponentInChildren<TextMeshProUGUI>();
                 if (label != null)
                 {
@@ -169,7 +211,10 @@ namespace EdenFarm.Score.UI
             }
         }
 
-        private void FetchMyStatsData()
+        /// <summary>
+        /// Mengonsumsi GET /api/score/user/:userId dari backend server Node.js.
+        /// </summary>
+        public void FetchMyStatsData()
         {
             var session = SessionManager.GetCurrentSession();
             int userId = session != null ? session.userId : 0;
@@ -186,15 +231,15 @@ namespace EdenFarm.Score.UI
                 var data = response.data;
                 if (data == null) return;
 
-                if (statPlayerNameText != null) statPlayerNameText.text = $"{data.nickname} (@{data.username})";
+                if (statPlayerNameText != null) statPlayerNameText.text = $"<b>{data.nickname}</b> (@{data.username})";
                 if (statHighestScoreText != null) statHighestScoreText.text = $"{data.highestScore} Poin";
                 if (statCumulativeScoreText != null) statCumulativeScoreText.text = $"{data.cumulativeScore} Poin";
                 if (statRankTierText != null) statRankTierText.text = $"{data.rank} (Tier {data.tierLevel})";
 
                 if (data.stats != null)
                 {
-                    if (statOrdersCompletedText != null) statOrdersCompletedText.text = $"{data.stats.totalOrdersCompleted}";
-                    if (statMatchesPlayedText != null) statMatchesPlayedText.text = $"{data.stats.totalMatchesPlayed}";
+                    if (statOrdersCompletedText != null) statOrdersCompletedText.text = $"{data.stats.totalOrdersCompleted} Order";
+                    if (statMatchesPlayedText != null) statMatchesPlayedText.text = $"{data.stats.totalMatchesPlayed} Match";
                 }
 
                 RenderRecentMatches(data.recentMatches);
@@ -219,10 +264,13 @@ namespace EdenFarm.Score.UI
             {
                 GameObject itemGo = new GameObject($"Match_{match.id}", typeof(RectTransform));
                 itemGo.transform.SetParent(recentMatchesContentList, false);
+                var layout = itemGo.AddComponent<LayoutElement>();
+                layout.minHeight = 32;
+
                 var txt = itemGo.AddComponent<TextMeshProUGUI>();
-                txt.fontSize = 16;
-                txt.color = Color.white;
-                txt.text = $"• Skor: +{match.score}  |  Hasil Tani: {match.cropsHarvested}  |  Order: {match.ordersLoaded}  ({match.recordedAt})";
+                txt.fontSize = 15;
+                txt.color = new Color(0.9f, 0.9f, 0.9f);
+                txt.text = $"• Skor: <b>+{match.score}</b>  |  Panen: {match.cropsHarvested}  |  Order: {match.ordersLoaded}";
             }
         }
 
@@ -232,6 +280,30 @@ namespace EdenFarm.Score.UI
             {
                 GameObject go = new GameObject("ScoreNetworkClient");
                 go.AddComponent<ScoreNetworkClient>();
+            }
+        }
+
+        private void AutoDiscoverReferences()
+        {
+            if (leaderboardContainer == null)
+            {
+                var t = transform.Find("LeaderboardContainer");
+                if (t != null) leaderboardContainer = t.gameObject;
+            }
+            if (myStatsContainer == null)
+            {
+                var t = transform.Find("MyStatsContainer");
+                if (t != null) myStatsContainer = t.gameObject;
+            }
+            if (leaderboardContentList == null && leaderboardContainer != null)
+            {
+                var t = leaderboardContainer.transform.Find("ScrollView/Viewport/Content");
+                if (t != null) leaderboardContentList = t;
+            }
+            if (recentMatchesContentList == null && myStatsContainer != null)
+            {
+                var t = myStatsContainer.transform.Find("HistoryScrollView/Viewport/Content");
+                if (t != null) recentMatchesContentList = t;
             }
         }
     }

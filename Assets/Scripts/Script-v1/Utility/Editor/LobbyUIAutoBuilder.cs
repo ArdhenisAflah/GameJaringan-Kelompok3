@@ -60,6 +60,9 @@ public static class LobbyUIAutoBuilder
         Transform oldBrowser = canvas.transform.Find("LobbyBrowserPanel");
         if (oldBrowser != null) Object.DestroyImmediate(oldBrowser.gameObject);
 
+        Transform oldLeaderboard = canvas.transform.Find("LeaderboardPanel");
+        if (oldLeaderboard != null) Object.DestroyImmediate(oldLeaderboard.gameObject);
+
         Transform oldInside = canvas.transform.Find("InsideRoomPanel");
         if (oldInside != null) Object.DestroyImmediate(oldInside.gameObject);
 
@@ -68,7 +71,7 @@ public static class LobbyUIAutoBuilder
         if (looseCard != null) Object.DestroyImmediate(looseCard.gameObject);
 
         // ==========================================
-        // 3. CREATE LOBBY BROWSER PANEL
+        // 3. CREATE LOBBY BROWSER PANEL (SEBELAH KIRI)
         // ==========================================
         GameObject browserPanel = new GameObject("LobbyBrowserPanel");
         browserPanel.transform.SetParent(canvas.transform, false);
@@ -76,6 +79,7 @@ public static class LobbyUIAutoBuilder
         bpRect.anchorMin = new Vector2(0.5f, 0.5f);
         bpRect.anchorMax = new Vector2(0.5f, 0.5f);
         bpRect.pivot = new Vector2(0.5f, 0.5f);
+        bpRect.anchoredPosition = new Vector2(-280, 0); // Bergeser ke kiri
         bpRect.sizeDelta = new Vector2(1050, 680);
 
         Image bpImage = browserPanel.AddComponent<Image>();
@@ -285,6 +289,263 @@ public static class LobbyUIAutoBuilder
         Button joinByCodeButton = joinBtnGo.GetComponent<Button>();
         joinBtnGo.GetComponent<Image>().color = new Color(0.22f, 0.45f, 0.78f, 1f);
         joinBtnGo.GetComponentInChildren<TextMeshProUGUI>().text = "Join by Code";
+
+        // ==========================================
+        // 3.1 CREATE LEADERBOARD PANEL (BERDAMPINGAN SEBELAH KANAN)
+        // ==========================================
+        GameObject leaderboardPanel = new GameObject("LeaderboardPanel");
+        leaderboardPanel.transform.SetParent(canvas.transform, false);
+        RectTransform lbRect = leaderboardPanel.AddComponent<RectTransform>();
+        lbRect.anchorMin = new Vector2(0.5f, 0.5f);
+        lbRect.anchorMax = new Vector2(0.5f, 0.5f);
+        lbRect.pivot = new Vector2(0.5f, 0.5f);
+        lbRect.anchoredPosition = new Vector2(510, 0); // Berdampingan di sebelah kanan Lobby
+        lbRect.sizeDelta = new Vector2(480, 680);
+
+        Image lbImage = leaderboardPanel.AddComponent<Image>();
+        lbImage.sprite = tmpResources.background;
+        lbImage.type = Image.Type.Sliced;
+        lbImage.color = new Color(0.10f, 0.12f, 0.18f, 0.95f);
+
+        // Header Title
+        GameObject lbHeaderGo = TMP_DefaultControls.CreateText(tmpResources);
+        lbHeaderGo.name = "HeaderTitle";
+        lbHeaderGo.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform lbhRect = lbHeaderGo.GetComponent<RectTransform>();
+        lbhRect.anchorMin = new Vector2(0, 1);
+        lbhRect.anchorMax = new Vector2(1, 1);
+        lbhRect.pivot = new Vector2(0.5f, 1);
+        lbhRect.anchoredPosition = new Vector2(0, -15);
+        lbhRect.sizeDelta = new Vector2(0, 44);
+        TextMeshProUGUI lbHeaderText = lbHeaderGo.GetComponent<TextMeshProUGUI>();
+        lbHeaderText.text = "EDEN LEADERBOARD";
+        lbHeaderText.fontSize = 26;
+        lbHeaderText.fontStyle = FontStyles.Bold;
+        lbHeaderText.alignment = TextAlignmentOptions.Center;
+        lbHeaderText.color = new Color(1f, 0.85f, 0.2f);
+
+        // Tab Leaderboard Button
+        GameObject tabLbBtnGo = TMP_DefaultControls.CreateButton(tmpResources);
+        tabLbBtnGo.name = "TabLeaderboardBtn";
+        tabLbBtnGo.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform tlbRect = tabLbBtnGo.GetComponent<RectTransform>();
+        tlbRect.anchorMin = new Vector2(0, 1);
+        tlbRect.anchorMax = new Vector2(0, 1);
+        tlbRect.pivot = new Vector2(0, 1);
+        tlbRect.anchoredPosition = new Vector2(25, -68);
+        tlbRect.sizeDelta = new Vector2(140, 36);
+        Button tabLbBtn = tabLbBtnGo.GetComponent<Button>();
+        tabLbBtnGo.GetComponentInChildren<TextMeshProUGUI>().text = "Top 10";
+
+        // Tab My Stats Button
+        GameObject tabStatsBtnGo = TMP_DefaultControls.CreateButton(tmpResources);
+        tabStatsBtnGo.name = "TabMyStatsBtn";
+        tabStatsBtnGo.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform tstRect = tabStatsBtnGo.GetComponent<RectTransform>();
+        tstRect.anchorMin = new Vector2(0, 1);
+        tstRect.anchorMax = new Vector2(0, 1);
+        tstRect.pivot = new Vector2(0, 1);
+        tstRect.anchoredPosition = new Vector2(175, -68);
+        tstRect.sizeDelta = new Vector2(140, 36);
+        Button tabStatsBtn = tabStatsBtnGo.GetComponent<Button>();
+        tabStatsBtnGo.GetComponentInChildren<TextMeshProUGUI>().text = "Profil Saya";
+
+        // Refresh Button
+        GameObject lbRefreshBtnGo = TMP_DefaultControls.CreateButton(tmpResources);
+        lbRefreshBtnGo.name = "RefreshBtn";
+        lbRefreshBtnGo.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform lbrfRect = lbRefreshBtnGo.GetComponent<RectTransform>();
+        lbrfRect.anchorMin = new Vector2(1, 1);
+        lbrfRect.anchorMax = new Vector2(1, 1);
+        lbrfRect.pivot = new Vector2(1, 1);
+        lbrfRect.anchoredPosition = new Vector2(-25, -68);
+        lbrfRect.sizeDelta = new Vector2(100, 36);
+        Button lbRefreshBtn = lbRefreshBtnGo.GetComponent<Button>();
+        lbRefreshBtnGo.GetComponentInChildren<TextMeshProUGUI>().text = "Refresh";
+
+        // Container Tab 1: Leaderboard
+        GameObject lbContainer = new GameObject("LeaderboardContainer");
+        lbContainer.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform lbcRect = lbContainer.AddComponent<RectTransform>();
+        lbcRect.anchorMin = new Vector2(0, 0);
+        lbcRect.anchorMax = new Vector2(1, 1);
+        lbcRect.offsetMin = new Vector2(25, 20);
+        lbcRect.offsetMax = new Vector2(-25, -115);
+
+        // Scroll View
+        GameObject lbScrollGo = new GameObject("ScrollView");
+        lbScrollGo.transform.SetParent(lbContainer.transform, false);
+        RectTransform lbsRect = lbScrollGo.AddComponent<RectTransform>();
+        lbsRect.anchorMin = Vector2.zero;
+        lbsRect.anchorMax = Vector2.one;
+        lbsRect.sizeDelta = Vector2.zero;
+        Image lbsBg = lbScrollGo.AddComponent<Image>();
+        lbsBg.sprite = tmpResources.inputField;
+        lbsBg.type = Image.Type.Sliced;
+        lbsBg.color = new Color(0.06f, 0.08f, 0.12f, 0.90f);
+        ScrollRect lbsScroll = lbScrollGo.AddComponent<ScrollRect>();
+        lbsScroll.horizontal = false;
+        lbsScroll.vertical = true;
+
+        GameObject lbVp = new GameObject("Viewport");
+        lbVp.transform.SetParent(lbScrollGo.transform, false);
+        RectTransform lbvpRect = lbVp.AddComponent<RectTransform>();
+        lbvpRect.anchorMin = Vector2.zero;
+        lbvpRect.anchorMax = Vector2.one;
+        lbvpRect.sizeDelta = Vector2.zero;
+        lbVp.AddComponent<RectMask2D>();
+        lbsScroll.viewport = lbvpRect;
+
+        GameObject lbContent = new GameObject("Content");
+        lbContent.transform.SetParent(lbVp.transform, false);
+        RectTransform lbcntRect = lbContent.AddComponent<RectTransform>();
+        lbcntRect.anchorMin = new Vector2(0, 1);
+        lbcntRect.anchorMax = new Vector2(1, 1);
+        lbcntRect.pivot = new Vector2(0.5f, 1);
+        lbcntRect.sizeDelta = new Vector2(0, 0);
+        VerticalLayoutGroup lblayout = lbContent.AddComponent<VerticalLayoutGroup>();
+        lblayout.childControlWidth = true;
+        lblayout.childControlHeight = false;
+        lblayout.childForceExpandWidth = true;
+        lblayout.childForceExpandHeight = false;
+        lblayout.spacing = 6;
+        lblayout.padding = new RectOffset(10, 10, 10, 10);
+        ContentSizeFitter lbcsf = lbContent.AddComponent<ContentSizeFitter>();
+        lbcsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        lbsScroll.content = lbcntRect;
+
+        // Status Text
+        GameObject statusTextGo = TMP_DefaultControls.CreateText(tmpResources);
+        statusTextGo.name = "StatusText";
+        statusTextGo.transform.SetParent(lbContainer.transform, false);
+        RectTransform stRect = statusTextGo.GetComponent<RectTransform>();
+        stRect.anchorMin = Vector2.zero;
+        stRect.anchorMax = Vector2.one;
+        stRect.sizeDelta = Vector2.zero;
+        TextMeshProUGUI lbStatusTmp = statusTextGo.GetComponent<TextMeshProUGUI>();
+        lbStatusTmp.text = "Memuat data...";
+        lbStatusTmp.alignment = TextAlignmentOptions.Center;
+        lbStatusTmp.fontSize = 18;
+
+        // Container Tab 2: My Stats
+        GameObject statsContainer = new GameObject("MyStatsContainer");
+        statsContainer.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform stcRect = statsContainer.AddComponent<RectTransform>();
+        stcRect.anchorMin = new Vector2(0, 0);
+        stcRect.anchorMax = new Vector2(1, 1);
+        stcRect.offsetMin = new Vector2(25, 20);
+        stcRect.offsetMax = new Vector2(-25, -115);
+        Image stcBg = statsContainer.AddComponent<Image>();
+        stcBg.sprite = tmpResources.inputField;
+        stcBg.type = Image.Type.Sliced;
+        stcBg.color = new Color(0.06f, 0.08f, 0.12f, 0.90f);
+
+        // Player Name Text
+        GameObject pNameGo = TMP_DefaultControls.CreateText(tmpResources);
+        pNameGo.name = "PlayerNameText";
+        pNameGo.transform.SetParent(statsContainer.transform, false);
+        RectTransform pnRect = pNameGo.GetComponent<RectTransform>();
+        pnRect.anchoredPosition = new Vector2(0, 220);
+        pnRect.sizeDelta = new Vector2(400, 36);
+        TextMeshProUGUI pNameTmp = pNameGo.GetComponent<TextMeshProUGUI>();
+        pNameTmp.fontSize = 22;
+        pNameTmp.fontStyle = FontStyles.Bold;
+        pNameTmp.alignment = TextAlignmentOptions.Center;
+        pNameTmp.color = Color.white;
+
+        // Rank Tier Text
+        GameObject rTierGo = TMP_DefaultControls.CreateText(tmpResources);
+        rTierGo.name = "RankTierText";
+        rTierGo.transform.SetParent(statsContainer.transform, false);
+        RectTransform rtRect2 = rTierGo.GetComponent<RectTransform>();
+        rtRect2.anchoredPosition = new Vector2(0, 185);
+        rtRect2.sizeDelta = new Vector2(400, 30);
+        TextMeshProUGUI rTierTmp = rTierGo.GetComponent<TextMeshProUGUI>();
+        rTierTmp.fontSize = 18;
+        rTierTmp.alignment = TextAlignmentOptions.Center;
+        rTierTmp.color = new Color(0.3f, 0.85f, 1f);
+
+        // Highest Score Text
+        GameObject hScoreGo = TMP_DefaultControls.CreateText(tmpResources);
+        hScoreGo.name = "HighestScoreText";
+        hScoreGo.transform.SetParent(statsContainer.transform, false);
+        RectTransform hsRect = hScoreGo.GetComponent<RectTransform>();
+        hsRect.anchoredPosition = new Vector2(0, 135);
+        hsRect.sizeDelta = new Vector2(400, 30);
+        TextMeshProUGUI hScoreTmp = hScoreGo.GetComponent<TextMeshProUGUI>();
+        hScoreTmp.fontSize = 18;
+        hScoreTmp.alignment = TextAlignmentOptions.Center;
+        hScoreTmp.color = new Color(1f, 0.85f, 0.2f);
+
+        // Cumulative Score Text
+        GameObject cScoreGo = TMP_DefaultControls.CreateText(tmpResources);
+        cScoreGo.name = "CumulativeScoreText";
+        cScoreGo.transform.SetParent(statsContainer.transform, false);
+        RectTransform csRect = cScoreGo.GetComponent<RectTransform>();
+        csRect.anchoredPosition = new Vector2(0, 100);
+        csRect.sizeDelta = new Vector2(400, 30);
+        TextMeshProUGUI cScoreTmp = cScoreGo.GetComponent<TextMeshProUGUI>();
+        cScoreTmp.fontSize = 16;
+        cScoreTmp.alignment = TextAlignmentOptions.Center;
+        cScoreTmp.color = Color.white;
+
+        // History ScrollView
+        GameObject histScrollGo = new GameObject("HistoryScrollView");
+        histScrollGo.transform.SetParent(statsContainer.transform, false);
+        RectTransform hscRect = histScrollGo.AddComponent<RectTransform>();
+        hscRect.anchorMin = new Vector2(0, 0);
+        hscRect.anchorMax = new Vector2(1, 0.6f);
+        hscRect.offsetMin = new Vector2(10, 10);
+        hscRect.offsetMax = new Vector2(-10, -10);
+        ScrollRect histScroll = histScrollGo.AddComponent<ScrollRect>();
+        histScroll.horizontal = false;
+        histScroll.vertical = true;
+
+        GameObject histVp = new GameObject("Viewport");
+        histVp.transform.SetParent(histScrollGo.transform, false);
+        RectTransform histVpRect = histVp.AddComponent<RectTransform>();
+        histVpRect.anchorMin = Vector2.zero;
+        histVpRect.anchorMax = Vector2.one;
+        histVpRect.sizeDelta = Vector2.zero;
+        histVp.AddComponent<RectMask2D>();
+        histScroll.viewport = histVpRect;
+
+        GameObject histContent = new GameObject("Content");
+        histContent.transform.SetParent(histVp.transform, false);
+        RectTransform histCntRect = histContent.AddComponent<RectTransform>();
+        histCntRect.anchorMin = new Vector2(0, 1);
+        histCntRect.anchorMax = new Vector2(1, 1);
+        histCntRect.pivot = new Vector2(0.5f, 1);
+        histCntRect.sizeDelta = new Vector2(0, 0);
+        VerticalLayoutGroup hLayout = histContent.AddComponent<VerticalLayoutGroup>();
+        hLayout.childControlWidth = true;
+        hLayout.childControlHeight = false;
+        hLayout.childForceExpandWidth = true;
+        hLayout.childForceExpandHeight = false;
+        hLayout.spacing = 4;
+        ContentSizeFitter hCsf = histContent.AddComponent<ContentSizeFitter>();
+        hCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        histScroll.content = histCntRect;
+
+        statsContainer.SetActive(false);
+
+        // Attach & Wire LeaderboardUIController component
+        var lbController = leaderboardPanel.AddComponent<EdenFarm.Score.UI.LeaderboardUIController>();
+        SerializedObject lbSo = new SerializedObject(lbController);
+        lbSo.FindProperty("panelRoot").objectReferenceValue = leaderboardPanel;
+        lbSo.FindProperty("tabLeaderboardButton").objectReferenceValue = tabLbBtn;
+        lbSo.FindProperty("tabMyStatsButton").objectReferenceValue = tabStatsBtn;
+        lbSo.FindProperty("refreshButton").objectReferenceValue = lbRefreshBtn;
+        lbSo.FindProperty("leaderboardContainer").objectReferenceValue = lbContainer;
+        lbSo.FindProperty("myStatsContainer").objectReferenceValue = statsContainer;
+        lbSo.FindProperty("leaderboardContentList").objectReferenceValue = lbContent.transform;
+        lbSo.FindProperty("leaderboardStatusText").objectReferenceValue = lbStatusTmp;
+        lbSo.FindProperty("statPlayerNameText").objectReferenceValue = pNameTmp;
+        lbSo.FindProperty("statHighestScoreText").objectReferenceValue = hScoreTmp;
+        lbSo.FindProperty("statCumulativeScoreText").objectReferenceValue = cScoreTmp;
+        lbSo.FindProperty("statRankTierText").objectReferenceValue = rTierTmp;
+        lbSo.FindProperty("recentMatchesContentList").objectReferenceValue = histContent.transform;
+        lbSo.ApplyModifiedProperties();
 
         // ==========================================
         // 4. CREATE INSIDE ROOM PANEL
