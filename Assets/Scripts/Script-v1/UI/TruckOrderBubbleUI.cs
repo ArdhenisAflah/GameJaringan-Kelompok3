@@ -70,11 +70,32 @@ namespace TruckOrder
 
             AutoDiscoverReferences();
             LoadDefaultSpritesIfNeeded();
+            EnforceTopSortingOrder();
 
             // Aturan Emas unity-runtime-ui: Panel modal awal disembunyikan via panelRoot
             if (panelRoot != null)
             {
                 panelRoot.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// Memastikan Canvas memiliki sortingOrder tertinggi (9999) dan render mode ScreenSpaceOverlay
+        /// agar Order Box UI selalu berada di lapisan paling atas dari apapun.
+        /// </summary>
+        public void EnforceTopSortingOrder()
+        {
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas == null)
+            {
+                canvas = GetComponentInParent<Canvas>();
+            }
+
+            if (canvas != null)
+            {
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = 9999;
             }
         }
 
@@ -356,7 +377,8 @@ namespace TruckOrder
                 canvasGo = new GameObject("TruckOrderCanvas");
                 canvas = canvasGo.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                canvas.sortingOrder = 100; // Selalu di atas layer truk dan world
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = 9999; // Selalu berada di lapisan paling atas dari apapun (HUD, objek world, modal lain)
 
                 CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -365,6 +387,12 @@ namespace TruckOrder
                 scaler.matchWidthOrHeight = 0.5f;
 
                 canvasGo.AddComponent<GraphicRaycaster>();
+            }
+            else
+            {
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = 9999;
             }
 
             // 3. Controller pada Canvas root (Controller Always Active)
