@@ -103,7 +103,8 @@ public class LobbyUI : MonoBehaviour
     {
         if (EdenFarm.Score.UI.LeaderboardUIController.Instance != null)
         {
-            EdenFarm.Score.UI.LeaderboardUIController.Instance.OpenModal();
+            EdenFarm.Score.UI.LeaderboardUIController.Instance.SetPanelVisible(true);
+            EdenFarm.Score.UI.LeaderboardUIController.Instance.RefreshCurrentTab();
         }
         else
         {
