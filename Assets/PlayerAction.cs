@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using FishNet.Object;
 
 public class PlayerAction : NetworkBehaviour
@@ -11,18 +12,13 @@ public class PlayerAction : NetworkBehaviour
 
     [Header("Jangkauan Aksi")]
     [Tooltip("Jarak petak di depan pemain yang ditargetkan.")]
-    [SerializeField] private float reachDistance = 0.6f;
+    [SerializeField] private float reachDistance = 1.0f;
 
-    [Header("Visual Grid Highlight")]
-    [Tooltip("Menampilkan kotak highlight target di Game View.")]
+    [Header("Visual Spritesheet Selector")]
+    [Tooltip("Menampilkan animasi spritesheet grid selector di Game View.")]
     [SerializeField] private bool showGridHighlight = true;
-    [Tooltip("Sorting layer untuk visualisasi kotak grid (harus di atas layer Tanah dan Tanaman).")]
-    [SerializeField] private string gridSortingLayerName = "Tanaman";
-    [Tooltip("Order in layer untuk visualisasi kotak grid (misal: 50 agar selalu di atas tanaman yang ber-order 5).")]
-    [SerializeField] private int gridSortingOrder = 50;
-    [SerializeField] private Color highlightColorCangkul = new Color(1f, 0.85f, 0.2f, 0.85f);
-    [SerializeField] private Color highlightColorSiram = new Color(0.2f, 0.75f, 1f, 0.85f);
-    [SerializeField] private Color highlightColorDefault = new Color(1f, 1f, 1f, 0.5f);
+    [Tooltip("Daftar frame animasi opsional jika diisi manual via Inspector (default auto-load dari Placement Area.png).")]
+    [SerializeField] private Sprite[] selectorFrames;
 
     [Header("Animasi & Durasi Aksi")]
     [Tooltip("Durasi animasi menyiram tanaman sebelum pemain dapat bergerak kembali (detik).")]
@@ -33,8 +29,13 @@ public class PlayerAction : NetworkBehaviour
     private PlayerMovement _playerMovement;
     private PlayerAnimation _playerAnimation;
     private SiloSystem.PlayerInventory _playerInventory;
-    private GameObject _gridHighlightObj;
-    private LineRenderer _gridLineRenderer;
+    private Farming.PlayerPlanter _playerPlanter;
+
+    private GameObject _tileIndicatorObj;
+    private TilePlacementIndicator _tileIndicator;
+
+    public TilePlacementIndicator TileIndicator => _tileIndicator;
+
     private bool _isActionLocked;
     private Coroutine _wateringCoroutine;
     private Coroutine _diggingCoroutine;
@@ -44,6 +45,7 @@ public class PlayerAction : NetworkBehaviour
         _playerMovement = GetComponent<PlayerMovement>();
         _playerAnimation = GetComponent<PlayerAnimation>();
         _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
+        _playerPlanter = GetComponent<Farming.PlayerPlanter>();
     }
 
     private void OnDisable()
@@ -74,7 +76,7 @@ public class PlayerAction : NetworkBehaviour
     {
         base.OnStartClient();
 
-        // Hanya buat in-game highlight pada client pemilik karakter
+        // Hanya buat in-game highlight pada client pemilik karakter (IsOwner)
         if (IsOwner && showGridHighlight)
         {
             SetupGridHighlighter();
@@ -83,65 +85,30 @@ public class PlayerAction : NetworkBehaviour
 
     private void OnDestroy()
     {
-        if (_gridHighlightObj != null)
+        if (_tileIndicatorObj != null)
         {
-            Destroy(_gridHighlightObj);
+            Destroy(_tileIndicatorObj);
         }
     }
 
     private void SetupGridHighlighter()
     {
-        if (_gridHighlightObj != null) return;
+        if (_tileIndicatorObj != null) return;
 
-        _gridHighlightObj = new GameObject("GridTargetHighlighter");
-        _gridLineRenderer = _gridHighlightObj.AddComponent<LineRenderer>();
-        _gridLineRenderer.useWorldSpace = true;
-        _gridLineRenderer.loop = true;
-        _gridLineRenderer.positionCount = 4;
-        _gridLineRenderer.startWidth = 0.04f;
-        _gridLineRenderer.endWidth = 0.04f;
-
-        // Gunakan default sprite material agar tidak pink/missing
-        Shader spriteShader = Shader.Find("Sprites/Default");
-        if (spriteShader != null)
-        {
-            _gridLineRenderer.material = new Material(spriteShader);
-        }
-
-        // Atur sorting layer dan order agar selalu berada di atas tanah dan tanaman
-        if (!string.IsNullOrEmpty(gridSortingLayerName))
-        {
-            _gridLineRenderer.sortingLayerName = gridSortingLayerName;
-        }
-        _gridLineRenderer.sortingOrder = gridSortingOrder;
-
-        _gridLineRenderer.startColor = highlightColorDefault;
-        _gridLineRenderer.endColor = highlightColorDefault;
-    }
-
-    protected override void OnValidate()
-    {
-        base.OnValidate();
-        if (_gridLineRenderer != null)
-        {
-            if (!string.IsNullOrEmpty(gridSortingLayerName))
-            {
-                _gridLineRenderer.sortingLayerName = gridSortingLayerName;
-            }
-            _gridLineRenderer.sortingOrder = gridSortingOrder;
-        }
+        _tileIndicatorObj = new GameObject("TilePlacementIndicator");
+        _tileIndicator = _tileIndicatorObj.AddComponent<TilePlacementIndicator>();
+        _tileIndicator.Initialize(this, _playerMovement, _playerInventory, _playerPlanter, selectorFrames);
     }
 
     private void Update()
     {
         if (!IsOwner) return;
 
-        // Update target posisi & in-game grid highlight
+        // Update target posisi
         Vector3 targetPos = GetTargetWorldPosition();
         Vector3 cellCenter = GetTargetCellCenter(targetPos);
-        UpdateGridHighlighter(cellCenter);
 
-        // Jika pemain sedang dalam proses aksi (misal sedang menyiram), abaikan input baru
+        // Jika pemain sedang dalam proses aksi (misal sedang menyiram/mencangkul), abaikan input baru
         if (_isActionLocked) return;
 
         // ==========================================
@@ -221,9 +188,16 @@ public class PlayerAction : NetworkBehaviour
         }
 
         // ==========================================
-        // 3. GUNAKAN ALAT (Tombol Space)
+        // 3. GUNAKAN ALAT (Tombol Space atau Klik Kiri Mouse)
         // ==========================================
-        if (Input.GetKeyDown(KeyCode.Space))
+        bool isPointerOverUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        bool isLeftClick = Input.GetMouseButtonDown(0) && !isPointerOverUI;
+        bool isSpaceKey = Input.GetKeyDown(KeyCode.Space);
+
+        // Jika pemain memegang benih, penanaman (baik [E] maupun Klik Kiri) ditangani oleh PlayerPlanter
+        bool isHoldingSeed = _playerInventory != null && _playerInventory.IsHoldingSeed;
+
+        if (isSpaceKey || (isLeftClick && !isHoldingSeed))
         {
             if (LahanManagerTilemap.Instance == null)
             {
@@ -240,12 +214,15 @@ public class PlayerAction : NetworkBehaviour
                     ExecuteWateringAction(targetPos);
                     break;
                 case TipeAlat.TanganKosong:
-                    // Coba memanen tanaman jika ada tanaman matang di petak depan pemain
+                    // Coba memanen tanaman jika ada tanaman matang di petak target
                     if (TryHarvestPlantAt(targetPos))
                     {
                         break;
                     }
-                    Debug.Log("[PlayerAction] Tangan kosong! Tekan '2' untuk Cangkul, '3' untuk Alat Siram, atau dekati tanaman matang untuk memanen.");
+                    if (isSpaceKey)
+                    {
+                        Debug.Log("[PlayerAction] Tangan kosong! Tekan '2' untuk Cangkul, '3' untuk Alat Siram, atau dekati tanaman matang untuk memanen.");
+                    }
                     break;
             }
         }
@@ -313,6 +290,18 @@ public class PlayerAction : NetworkBehaviour
     }
 
     /// <summary>
+    /// Menyelaraskan arah hadap karakter (flipX) ke petak target sebelum animasi aksi dimulai.
+    /// </summary>
+    private void AlignFacingToTarget(Vector3 targetPos)
+    {
+        if (_playerMovement != null)
+        {
+            Vector2 dir = (Vector2)(targetPos - transform.position);
+            _playerMovement.SetFacingDirection(dir);
+        }
+    }
+
+    /// <summary>
     /// Menjalankan aksi mencangkul tanah disertai animasi digging_animation dan penguncian pergerakan karakter.
     /// </summary>
     private void ExecuteDiggingAction(Vector3 targetPos)
@@ -321,6 +310,9 @@ public class PlayerAction : NetworkBehaviour
 
         // Validasi: Hanya picu animasi dan aksi jika tanah belum dicangkul
         if (!CanDigAt(targetPos)) return;
+
+        // Hadapkan karakter ke arah target sebelum animasi dimulai
+        AlignFacingToTarget(targetPos);
 
         if (_diggingCoroutine != null)
         {
@@ -398,6 +390,9 @@ public class PlayerAction : NetworkBehaviour
         // Validasi: Hanya picu animasi dan aksi jika tanah sudah berupa TileKering
         if (!CanWaterAt(targetPos)) return;
 
+        // Hadapkan karakter ke arah target sebelum animasi dimulai
+        AlignFacingToTarget(targetPos);
+
         if (_wateringCoroutine != null)
         {
             StopCoroutine(_wateringCoroutine);
@@ -440,8 +435,44 @@ public class PlayerAction : NetworkBehaviour
         _wateringCoroutine = null;
     }
 
-    private bool TryHarvestPlantAt(Vector3 targetPos)
+    /// <summary>
+    /// Memeriksa apakah ada tanaman yang telah matang pada petak target.
+    /// </summary>
+    public bool HasMaturePlantAt(Vector3 targetPos)
     {
+        // 1. Cek via Physics2D Overlap di area petak depan
+        Collider2D[] hits = Physics2D.OverlapCircleAll(targetPos, 0.45f);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Farming.Plant plant = hits[i].GetComponentInParent<Farming.Plant>();
+            if (plant != null && plant.IsMature)
+            {
+                return true;
+            }
+        }
+
+        // 2. Fallback cek via LahanManagerTilemap jika collider tanaman belum aktif
+        if (LahanManagerTilemap.Instance != null)
+        {
+            GameObject plantObj = LahanManagerTilemap.Instance.GetTanaman(targetPos);
+            if (plantObj != null)
+            {
+                Farming.Plant plant = plantObj.GetComponent<Farming.Plant>();
+                if (plant != null && plant.IsMature)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public bool TryHarvestPlantAt(Vector3 targetPos)
+    {
+        // Hadapkan karakter ke arah target tanaman yang hendak dipanen
+        AlignFacingToTarget(targetPos);
+
         // 1. Cek via Physics2D Overlap di area petak depan
         Collider2D[] hits = Physics2D.OverlapCircleAll(targetPos, 0.45f);
         for (int i = 0; i < hits.Length; i++)
@@ -495,6 +526,11 @@ public class PlayerAction : NetworkBehaviour
 
     public Vector3 GetTargetWorldPosition()
     {
+        if (_tileIndicator != null)
+        {
+            return _tileIndicator.CurrentTargetCenter;
+        }
+
         Vector2 facing = (_playerMovement != null) ? _playerMovement.FacingDirection : Vector2.down;
         if (facing == Vector2.zero) facing = Vector2.down;
         return transform.position + (Vector3)(facing.normalized * reachDistance);
@@ -514,36 +550,15 @@ public class PlayerAction : NetworkBehaviour
         return new Vector3(snapX, snapY, 0f);
     }
 
-    private void UpdateGridHighlighter(Vector3 center)
-    {
-        if (_gridLineRenderer == null || !_gridLineRenderer.enabled) return;
-
-        // Pilih warna berdasarkan alat yang dipegang
-        Color activeColor = highlightColorDefault;
-        if (alatDiTangan == TipeAlat.Cangkul) activeColor = highlightColorCangkul;
-        else if (alatDiTangan == TipeAlat.AlatSiram) activeColor = highlightColorSiram;
-
-        _gridLineRenderer.startColor = activeColor;
-        _gridLineRenderer.endColor = activeColor;
-
-        // Gambar 4 sudut kotak grid (ukuran 1x1 cell) dengan sedikit Z-offset ke depan kamera
-        float halfSize = 0.48f;
-        float z = -0.05f;
-        _gridLineRenderer.SetPosition(0, new Vector3(center.x - halfSize, center.y - halfSize, z));
-        _gridLineRenderer.SetPosition(1, new Vector3(center.x + halfSize, center.y - halfSize, z));
-        _gridLineRenderer.SetPosition(2, new Vector3(center.x + halfSize, center.y + halfSize, z));
-        _gridLineRenderer.SetPosition(3, new Vector3(center.x - halfSize, center.y + halfSize, z));
-    }
-
     private void OnDrawGizmos()
     {
         // Visualisasi kotak grid yang ditargetkan di Scene View editor
         Vector3 targetPos = GetTargetWorldPosition();
         Vector3 cellCenter = GetTargetCellCenter(targetPos);
 
-        Color gizmoColor = highlightColorDefault;
-        if (alatDiTangan == TipeAlat.Cangkul) gizmoColor = highlightColorCangkul;
-        else if (alatDiTangan == TipeAlat.AlatSiram) gizmoColor = highlightColorSiram;
+        Color gizmoColor = Color.white;
+        if (alatDiTangan == TipeAlat.Cangkul) gizmoColor = Color.yellow;
+        else if (alatDiTangan == TipeAlat.AlatSiram) gizmoColor = Color.cyan;
 
         Gizmos.color = gizmoColor;
         Gizmos.DrawWireCube(cellCenter, new Vector3(0.96f, 0.96f, 0f));

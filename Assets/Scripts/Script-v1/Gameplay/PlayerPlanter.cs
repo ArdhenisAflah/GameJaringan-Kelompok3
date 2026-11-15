@@ -1,5 +1,7 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using FishNet.Object;
 using Farming.Placement;
 using SiloSystem;
@@ -24,7 +26,7 @@ namespace Farming
         [SerializeField] private PlacementType placementType = PlacementType.Grid;
 
         [Tooltip("Jarak jangkauan titik tanam di depan pemain.")]
-        [SerializeField] private float reachDistance = 0.6f;
+        [SerializeField] private float reachDistance = 1.0f;
 
         [Tooltip("Ukuran petak jika menggunakan PlacementType.Grid.")]
         [SerializeField] private float gridSize = 1.0f;
@@ -43,22 +45,40 @@ namespace Farming
         [Tooltip("Jeda waktu minimal (detik) antar aksi menanam untuk mencegah double input.")]
         [SerializeField] private float plantCooldown = 0.25f;
 
+        [Header("Animasi Menanam")]
+        [Tooltip("Durasi penguncian karakter saat animasi menanam berlangsung (detik).")]
+        [SerializeField] private float plantDuration = 0.25f;
+
         private float _lastPlantTime;
         private static readonly Dictionary<Vector2Int, GameObject> _fallbackOccupiedCells = new Dictionary<Vector2Int, GameObject>();
 
         private PlayerMovement _playerMovement;
         private SiloSystem.PlayerInventory _playerInventory;
         private IPlacementStrategy _placementStrategy;
+        private PlayerAction _playerAction;
+        private PlayerAnimation _playerAnimation;
+        private Coroutine _plantingCoroutine;
 
         private void Awake()
         {
             _playerMovement = GetComponent<PlayerMovement>();
             _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
+            _playerAction = GetComponent<PlayerAction>();
+            _playerAnimation = GetComponent<PlayerAnimation>();
             if (GetComponent<PlayerSeedInteractor>() == null)
             {
                 gameObject.AddComponent<PlayerSeedInteractor>();
             }
             UpdateStrategy();
+        }
+
+        private void OnDisable()
+        {
+            if (_plantingCoroutine != null)
+            {
+                StopCoroutine(_plantingCoroutine);
+                _plantingCoroutine = null;
+            }
         }
 
         protected override void OnValidate()
@@ -78,25 +98,137 @@ namespace Farming
             // Hanya client pemilik karakter yang berhak membaca input lokal
             if (!IsOwner) return;
 
-            if (Input.GetKeyDown(plantKey) && Time.time >= _lastPlantTime + plantCooldown)
+            // Jangan terima input jika pergerakan/aksi sedang dikunci
+            if (_playerMovement != null && _playerMovement.IsMovementLocked) return;
+
+            bool isPointerOverUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+            bool isHoldingSeed = _playerInventory != null && _playerInventory.IsHoldingSeed;
+            bool isLeftClick = Input.GetMouseButtonDown(0) && !isPointerOverUI && isHoldingSeed;
+            bool isPlantKey = Input.GetKeyDown(plantKey);
+
+            if ((isPlantKey || isLeftClick) && Time.time >= _lastPlantTime + plantCooldown)
             {
-                // 1. Tolak jika tangan sedang membawa hasil panen (Crop)
-                if (_playerInventory != null && _playerInventory.IsHoldingCrop)
+                Vector2 targetPos;
+                if (_playerAction != null && _playerAction.TileIndicator != null)
                 {
-                    Debug.Log($"<color=orange>[PlayerPlanter]</color> Tangan sedang membawa hasil panen '{_playerInventory.HeldType}'! Tidak dapat menanam. Kosongkan tangan atau setor ke Silo terlebih dahulu.");
-                    return;
+                    targetPos = (Vector2)_playerAction.TileIndicator.CurrentTargetCenter;
+                }
+                else
+                {
+                    Vector2 facingDir = _playerMovement != null ? _playerMovement.FacingDirection : Vector2.down;
+                    targetPos = GetTargetPosition(facingDir);
                 }
 
-                // 2. Tolak jika tangan tidak memegang benih (Seed)
-                if (_playerInventory == null || !_playerInventory.IsHoldingSeed)
-                {
-                    Debug.Log("<color=orange>[PlayerPlanter]</color> Tidak ada benih di tangan! Ambil benih dari Source Seed terlebih dahulu (tekan [F] di dekat sumber benih).");
-                    return;
-                }
-
-                _lastPlantTime = Time.time;
-                RequestPlantAction();
+                TryPlantAt(targetPos);
             }
+        }
+
+        /// <summary>
+        /// Menjalankan penanaman pada petak koordinat tertentu.
+        /// </summary>
+        public bool TryPlantAt(Vector2 targetPosition)
+        {
+            if (!IsOwner) return false;
+
+            // 1. Tolak jika tangan sedang membawa hasil panen (Crop)
+            if (_playerInventory != null && _playerInventory.IsHoldingCrop)
+            {
+                Debug.Log($"<color=orange>[PlayerPlanter]</color> Tangan sedang membawa hasil panen '{_playerInventory.HeldType}'! Tidak dapat menanam. Kosongkan tangan atau setor ke Silo terlebih dahulu.");
+                return false;
+            }
+
+            // 2. Tolak jika tangan tidak memegang benih (Seed)
+            if (_playerInventory == null || !_playerInventory.IsHoldingSeed)
+            {
+                Debug.Log("<color=orange>[PlayerPlanter]</color> Tidak ada benih di tangan! Ambil benih dari Source Seed terlebih dahulu (tekan [F] di dekat sumber benih).");
+                return false;
+            }
+
+            if (Time.time < _lastPlantTime + plantCooldown)
+            {
+                return false;
+            }
+
+            // Validasi lokal: Jangan eksekusi jika petak tidak valid untuk ditanam
+            if (!CanPlantAt(targetPosition))
+            {
+                return false;
+            }
+
+            _lastPlantTime = Time.time;
+
+            // Menyelaraskan arah hadap karakter ke petak target sebelum animasi dimulai
+            if (_playerMovement != null)
+            {
+                Vector2 dir = targetPosition - (Vector2)transform.position;
+                _playerMovement.SetFacingDirection(dir);
+            }
+
+            if (_plantingCoroutine != null)
+            {
+                StopCoroutine(_plantingCoroutine);
+            }
+            _plantingCoroutine = StartCoroutine(PlantingRoutine(targetPosition));
+            return true;
+        }
+
+        private IEnumerator PlantingRoutine(Vector2 targetPosition)
+        {
+            // Kunci pergerakan karakter saat animasi menanam berlangsung
+            if (_playerMovement != null)
+            {
+                _playerMovement.SetMovementLocked(true);
+            }
+
+            // Picu animasi menanam
+            if (_playerAnimation != null)
+            {
+                _playerAnimation.TriggerTanamAnimation();
+            }
+
+            // Kirim permintaan ke Server (Server-Authoritative)
+            ServerPlant(targetPosition);
+
+            yield return new WaitForSeconds(plantDuration);
+
+            // Buka kembali pergerakan karakter
+            if (_playerMovement != null)
+            {
+                _playerMovement.SetMovementLocked(false);
+            }
+
+            _plantingCoroutine = null;
+        }
+
+        /// <summary>
+        /// Memeriksa apakah petak target saat ini valid untuk ditanami benih.
+        /// </summary>
+        public bool CanPlantAt(Vector2 targetPosition)
+        {
+            if (_playerInventory == null || !_playerInventory.IsHoldingSeed) return false;
+
+            if (requireTilledSoil && LahanManagerTilemap.Instance != null)
+            {
+                if (!LahanManagerTilemap.Instance.HasTileKering(targetPosition))
+                {
+                    return false;
+                }
+                if (LahanManagerTilemap.Instance.IsPetakDitanam(targetPosition))
+                {
+                    return false;
+                }
+            }
+
+            if (blockedLayers.value != 0)
+            {
+                Collider2D overlap = Physics2D.OverlapCircle(targetPosition, 0.2f, blockedLayers);
+                if (overlap != null && overlap.gameObject != gameObject)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -106,24 +238,7 @@ namespace Farming
         {
             Vector2 facingDir = _playerMovement != null ? _playerMovement.FacingDirection : Vector2.down;
             Vector2 targetPosition = GetTargetPosition(facingDir);
-
-            // Validasi lokal: Jangan kirim RPC jika petak belum memiliki TileKering atau sudah terisi tanaman
-            if (requireTilledSoil && LahanManagerTilemap.Instance != null)
-            {
-                if (!LahanManagerTilemap.Instance.HasTileKering(targetPosition))
-                {
-                    Debug.Log("[PlayerPlanter] Tidak bisa menanam: Petak belum dicangkul (belum ada TileKering).");
-                    return;
-                }
-                if (LahanManagerTilemap.Instance.IsPetakDitanam(targetPosition))
-                {
-                    Debug.Log("[PlayerPlanter] Tidak bisa menanam: Petak sudah memiliki tanaman.");
-                    return;
-                }
-            }
-
-            // Kirim permintaan ke Server (Server-Authoritative)
-            ServerPlant(targetPosition);
+            TryPlantAt(targetPosition);
         }
 
         /// <summary>

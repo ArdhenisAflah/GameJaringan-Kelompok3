@@ -104,22 +104,6 @@ public class PlayerAnimation : NetworkBehaviour
 
     #endregion
 
-    private void Update()
-    {
-        // Hanya untuk validasi input tanam jika ada input utility
-        if (IsOwner && _controller != null && _controller.InputSource != null)
-        {
-            if (_controller.InputSource.IsPlantPressed)
-            {
-                // Jangan picu animasi tanam jika tangan sedang membawa hasil panen (bukan benih)
-                if (_inventory == null || !_inventory.IsHoldingCrop)
-                {
-                    TriggerTanamAnimation();
-                }
-            }
-        }
-    }
-
     #region Network Server RPCs
 
     [ServerRpc]

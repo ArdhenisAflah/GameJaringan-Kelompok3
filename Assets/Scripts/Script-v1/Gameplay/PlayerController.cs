@@ -79,6 +79,25 @@ public class PlayerController : NetworkBehaviour, Farming.IWiggleTriggerSource
         }
     }
 
+    /// <summary>
+    /// Mengubah arah hadap karakter secara eksplisit (misalnya ke arah placement indikator sebelum aksi dimulai).
+    /// Menyelaraskan vektor hadap serta memicu event OnFacingChanged agar visual Sprite flipX dan jaringan sinkron.
+    /// </summary>
+    public void SetFacingDirection(Vector2 direction)
+    {
+        if (direction.sqrMagnitude < 0.0001f) return;
+
+        _facingDirection = direction.normalized;
+        OnFacingDirectionChanged?.Invoke(_facingDirection);
+
+        if (Mathf.Abs(_facingDirection.x) > 0.01f)
+        {
+            bool facingLeft = _facingDirection.x < 0f;
+            _isFacingLeftLast = facingLeft;
+            OnFacingChanged?.Invoke(facingLeft);
+        }
+    }
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
