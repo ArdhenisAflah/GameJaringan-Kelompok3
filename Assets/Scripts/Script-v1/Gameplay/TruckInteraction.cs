@@ -109,7 +109,11 @@ namespace TruckOrder
             {
                 UpdatePromptText(localPlayer);
 
-                if (Input.GetKeyDown(interactKey))
+                var pInput = localPlayer.GetComponent<Utility.PlayerInput>();
+                if (pInput != null && !pInput.IsInputEnabled) return;
+
+                bool interactPressed = pInput != null ? pInput.IsInteractPressed : Input.GetKeyDown(interactKey);
+                if (interactPressed)
                 {
                     ExecuteInsert(localPlayer);
                 }

@@ -23,6 +23,7 @@ namespace SiloSystem
 
         private SiloStorage _nearestSilo;
         private NetworkObject _networkObject;
+        private Utility.PlayerInput _playerInput;
 
         public SiloStorage NearestSilo => _nearestSilo;
         public bool IsNearSilo => _nearestSilo != null;
@@ -37,6 +38,7 @@ namespace SiloSystem
             }
 
             _networkObject = GetComponent<NetworkObject>();
+            _playerInput = GetComponent<Utility.PlayerInput>() ?? GetComponentInParent<Utility.PlayerInput>();
         }
 
         private void Update()
@@ -46,10 +48,14 @@ namespace SiloSystem
 
             EvaluateNearestSilo();
 
+            // Jika input dikunci secara terpusat (misal saat UI terbuka atau pause), abaikan interaksi
+            if (_playerInput != null && !_playerInput.IsInputEnabled) return;
+
             // Shortcut Quick Deposit: Tekan 'F' saat membawa barang di dekat Silo
             if (_nearestSilo != null && playerInventory != null && playerInventory.HasItem)
             {
-                if (Input.GetKeyDown(quickDepositKey))
+                bool depositPressed = _playerInput != null ? _playerInput.IsInteractPressed : Input.GetKeyDown(quickDepositKey);
+                if (depositPressed)
                 {
                     QuickDepositHeldItem();
                 }
