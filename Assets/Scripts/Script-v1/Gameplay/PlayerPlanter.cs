@@ -48,12 +48,14 @@ namespace Farming
 
         private PlayerMovement _playerMovement;
         private SiloSystem.PlayerInventory _playerInventory;
+        private Utility.PlayerInput _playerInput;
         private IPlacementStrategy _placementStrategy;
 
         private void Awake()
         {
             _playerMovement = GetComponent<PlayerMovement>();
             _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
+            _playerInput = GetComponent<Utility.PlayerInput>() ?? GetComponentInParent<Utility.PlayerInput>();
             if (GetComponent<PlayerSeedInteractor>() == null)
             {
                 gameObject.AddComponent<PlayerSeedInteractor>();
@@ -78,7 +80,11 @@ namespace Farming
             // Hanya client pemilik karakter yang berhak membaca input lokal
             if (!IsOwner) return;
 
-            if (Input.GetKeyDown(plantKey) && Time.time >= _lastPlantTime + plantCooldown)
+            // Jika input dikunci secara terpusat (misal saat UI terbuka atau pause), abaikan input
+            if (_playerInput != null && !_playerInput.IsInputEnabled) return;
+
+            bool plantPressed = _playerInput != null ? _playerInput.IsPlantPressed : Input.GetKeyDown(plantKey);
+            if (plantPressed && Time.time >= _lastPlantTime + plantCooldown)
             {
                 // 1. Tolak jika tangan sedang membawa hasil panen (Crop)
                 if (_playerInventory != null && _playerInventory.IsHoldingCrop)

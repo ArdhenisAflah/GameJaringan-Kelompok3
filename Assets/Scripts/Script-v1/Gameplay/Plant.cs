@@ -142,6 +142,72 @@ namespace Farming
             }
         }
 
+        public static event System.Action<Plant> OnAnyPlantDamaged;
+        public static event System.Action<Plant> OnAnyPlantEaten;
+
+        private Coroutine _flashCoroutine;
+        private Color _originalColor = Color.white;
+
+        /// <summary>
+        /// Dipanggil saat musuh menggigit tanaman ini untuk memicu efek visual putih (flash)
+        /// dan observer event bagi Technical VFX coder.
+        /// </summary>
+        public void TriggerBiteFlash(float duration = 0.15f)
+        {
+            OnAnyPlantDamaged?.Invoke(this);
+
+            if (IsServerStarted)
+            {
+                ObserversTriggerBiteFlash(duration);
+            }
+            else
+            {
+                StartFlashRoutine(duration);
+            }
+        }
+
+        [ObserversRpc(BufferLast = false)]
+        private void ObserversTriggerBiteFlash(float duration)
+        {
+            StartFlashRoutine(duration);
+        }
+
+        private void StartFlashRoutine(float duration)
+        {
+            if (spriteRenderer == null) return;
+            if (_flashCoroutine != null) StopCoroutine(_flashCoroutine);
+            _flashCoroutine = StartCoroutine(FlashWhiteRoutine(duration));
+        }
+
+        private System.Collections.IEnumerator FlashWhiteRoutine(float duration)
+        {
+            if (spriteRenderer != null)
+            {
+                _originalColor = Color.white;
+                // Tint putih terang / flash
+                spriteRenderer.color = new Color(2f, 2f, 2f, 1f);
+                yield return new WaitForSeconds(duration);
+                if (spriteRenderer != null)
+                {
+                    spriteRenderer.color = _originalColor;
+                }
+            }
+            _flashCoroutine = null;
+        }
+
+        /// <summary>
+        /// Menghapus dan mendespawn tanaman di server saat selesai dimakan hama/musuh.
+        /// </summary>
+        public bool ServerConsumeByEnemy()
+        {
+            if (!IsServerStarted) return false;
+
+            Debug.Log($"<color=red>[Plant]</color> Tanaman '{plantName}' habis dimakan oleh musuh!");
+            OnAnyPlantEaten?.Invoke(this);
+            ServerManager.Despawn(gameObject);
+            return true;
+        }
+
         private void OnDrawGizmos()
         {
             // Visualisasi titik tanaman di Scene editor

@@ -134,6 +134,11 @@ namespace SiloSystem.UI
             }
         }
 
+        private void OnDisable()
+        {
+            SetLocalPlayerInputEnabled(true);
+        }
+
         private void Update()
         {
             // Auto-hide notifikasi feedback setelah durasi tertentu
@@ -239,6 +244,7 @@ namespace SiloSystem.UI
             }
 
             TryBindLocalPlayer();
+            SetLocalPlayerInputEnabled(false);
 
             if (panelRoot != null)
             {
@@ -255,6 +261,8 @@ namespace SiloSystem.UI
 
         public void CloseUI()
         {
+            SetLocalPlayerInputEnabled(true);
+
             if (panelRoot != null)
             {
                 panelRoot.SetActive(false);
@@ -272,6 +280,8 @@ namespace SiloSystem.UI
 
         private void HandleTriggerClosed()
         {
+            SetLocalPlayerInputEnabled(true);
+
             if (panelRoot != null)
             {
                 panelRoot.SetActive(false);
@@ -279,6 +289,26 @@ namespace SiloSystem.UI
             else
             {
                 gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// Mengunci atau membuka pembacaan input pemain lokal (PlayerInput).
+        /// </summary>
+        private void SetLocalPlayerInputEnabled(bool enabled)
+        {
+            if (_localPlayerNob == null)
+            {
+                TryBindLocalPlayer();
+            }
+
+            if (_localPlayerNob != null)
+            {
+                var playerInput = _localPlayerNob.GetComponent<Utility.PlayerInput>();
+                if (playerInput != null)
+                {
+                    playerInput.SetInputEnabled(enabled);
+                }
             }
         }
 

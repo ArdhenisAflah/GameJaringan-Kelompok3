@@ -33,6 +33,7 @@ public class PlayerAction : NetworkBehaviour
     private PlayerMovement _playerMovement;
     private PlayerAnimation _playerAnimation;
     private SiloSystem.PlayerInventory _playerInventory;
+    private Utility.PlayerInput _playerInput;
     private GameObject _gridHighlightObj;
     private LineRenderer _gridLineRenderer;
     private bool _isActionLocked;
@@ -44,6 +45,7 @@ public class PlayerAction : NetworkBehaviour
         _playerMovement = GetComponent<PlayerMovement>();
         _playerAnimation = GetComponent<PlayerAnimation>();
         _playerInventory = GetComponent<SiloSystem.PlayerInventory>();
+        _playerInput = GetComponent<Utility.PlayerInput>() ?? GetComponentInParent<Utility.PlayerInput>();
     }
 
     private void OnDisable()
@@ -141,6 +143,9 @@ public class PlayerAction : NetworkBehaviour
         Vector3 cellCenter = GetTargetCellCenter(targetPos);
         UpdateGridHighlighter(cellCenter);
 
+        // Jika input dikunci secara terpusat (misal membuka UI Silo atau pause), abaikan seluruh aksi
+        if (_playerInput != null && !_playerInput.IsInputEnabled) return;
+
         // Jika pemain sedang dalam proses aksi (misal sedang menyiram), abaikan input baru
         if (_isActionLocked) return;
 
@@ -154,8 +159,13 @@ public class PlayerAction : NetworkBehaviour
             alatDiTangan = TipeAlat.TanganKosong;
 
             // Jika pemain mencoba menggunakan alat, berikan peringatan dan batalkan aksi
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Backslash) || Input.GetKeyDown(KeyCode.RightBracket) ||
-                Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Alpha3))
+            bool attemptToolAction = _playerInput != null
+                ? (_playerInput.IsActionPressed || _playerInput.IsBypassDigPressed || _playerInput.IsBypassWaterPressed || _playerInput.IsBypassGrassPressed ||
+                   _playerInput.IsToolEmptyPressed || _playerInput.IsToolHoePressed || _playerInput.IsToolWaterPressed)
+                : (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Backslash) || Input.GetKeyDown(KeyCode.RightBracket) || Input.GetKeyDown(KeyCode.LeftBracket) ||
+                   Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Alpha3));
+
+            if (attemptToolAction)
             {
                 string itemTag = _playerInventory.IsHoldingSeed ? $"{_playerInventory.HeldType} [Benih]" : $"{_playerInventory.HeldType}";
                 string actionHint = _playerInventory.IsHoldingSeed ? "Tanam dengan [E] pada lahan garapan terlebih dahulu." : "Setor ke Silo terlebih dahulu.";
@@ -168,7 +178,8 @@ public class PlayerAction : NetworkBehaviour
         // 1. BYPASS SHORTCUT (Testing Cepat)
         // ==========================================
         // Tekan '\' (Backslash) untuk MENCANGKUL paksa petak target
-        if (Input.GetKeyDown(KeyCode.Backslash))
+        bool bypassDig = _playerInput != null ? _playerInput.IsBypassDigPressed : Input.GetKeyDown(KeyCode.Backslash);
+        if (bypassDig)
         {
             if (LahanManagerTilemap.Instance != null)
             {
@@ -178,7 +189,8 @@ public class PlayerAction : NetworkBehaviour
         }
 
         // Tekan ']' (Right Bracket) untuk MENYIRAM paksa petak target
-        if (Input.GetKeyDown(KeyCode.RightBracket))
+        bool bypassWater = _playerInput != null ? _playerInput.IsBypassWaterPressed : Input.GetKeyDown(KeyCode.RightBracket);
+        if (bypassWater)
         {
             if (LahanManagerTilemap.Instance != null)
             {
@@ -188,7 +200,8 @@ public class PlayerAction : NetworkBehaviour
         }
 
         // Tekan '[' (Left Bracket) untuk MENGEMBALIKAN petak tanah ke Rumput secara dinamis
-        if (Input.GetKeyDown(KeyCode.LeftBracket))
+        bool bypassGrass = _playerInput != null ? _playerInput.IsBypassGrassPressed : Input.GetKeyDown(KeyCode.LeftBracket);
+        if (bypassGrass)
         {
             if (LahanManagerTilemap.Instance != null)
             {
@@ -199,12 +212,16 @@ public class PlayerAction : NetworkBehaviour
         // ==========================================
         // 2. GANTI ALAT CEPAT (Angka 1, 2, 3)
         // ==========================================
-        if (Input.GetKeyDown(KeyCode.Alpha1))
+        bool toolEmpty = _playerInput != null ? _playerInput.IsToolEmptyPressed : Input.GetKeyDown(KeyCode.Alpha1);
+        bool toolHoe = _playerInput != null ? _playerInput.IsToolHoePressed : Input.GetKeyDown(KeyCode.Alpha2);
+        bool toolWater = _playerInput != null ? _playerInput.IsToolWaterPressed : Input.GetKeyDown(KeyCode.Alpha3);
+
+        if (toolEmpty)
         {
             alatDiTangan = TipeAlat.TanganKosong;
             Debug.Log("[PlayerAction] Alat aktif: Tangan Kosong");
         }
-        else if (Input.GetKeyDown(KeyCode.Alpha2))
+        else if (toolHoe)
         {
             bool wasAlreadyCangkul = (alatDiTangan == TipeAlat.Cangkul);
             alatDiTangan = TipeAlat.Cangkul;
@@ -214,7 +231,7 @@ public class PlayerAction : NetworkBehaviour
                 ExecuteDiggingAction(targetPos);
             }
         }
-        else if (Input.GetKeyDown(KeyCode.Alpha3))
+        else if (toolWater)
         {
             alatDiTangan = TipeAlat.AlatSiram;
             Debug.Log("[PlayerAction] Alat aktif: Alat Siram");
@@ -223,7 +240,8 @@ public class PlayerAction : NetworkBehaviour
         // ==========================================
         // 3. GUNAKAN ALAT (Tombol Space)
         // ==========================================
-        if (Input.GetKeyDown(KeyCode.Space))
+        bool actionPressed = _playerInput != null ? _playerInput.IsActionPressed : Input.GetKeyDown(KeyCode.Space);
+        if (actionPressed)
         {
             if (LahanManagerTilemap.Instance == null)
             {

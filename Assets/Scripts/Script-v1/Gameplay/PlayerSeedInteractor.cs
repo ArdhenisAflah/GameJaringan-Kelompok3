@@ -19,6 +19,7 @@ namespace Farming
 
         private PlayerInventory _playerInventory;
         private NetworkObject _networkObject;
+        private Utility.PlayerInput _playerInput;
         private SeedSource _nearestSeedSource;
 
         public SeedSource NearestSeedSource => _nearestSeedSource;
@@ -30,6 +31,7 @@ namespace Farming
         {
             _playerInventory = GetComponent<PlayerInventory>();
             _networkObject = GetComponent<NetworkObject>();
+            _playerInput = GetComponent<Utility.PlayerInput>() ?? GetComponentInParent<Utility.PlayerInput>();
         }
 
         private void Update()
@@ -38,7 +40,11 @@ namespace Farming
 
             EvaluateNearestSeedSource();
 
-            if (_nearestSeedSource != null && Input.GetKeyDown(pickSeedKey))
+            // Jika input dikunci secara terpusat (misal saat UI terbuka atau pause), abaikan interaksi
+            if (_playerInput != null && !_playerInput.IsInputEnabled) return;
+
+            bool pickPressed = _playerInput != null ? _playerInput.IsInteractPressed : Input.GetKeyDown(pickSeedKey);
+            if (_nearestSeedSource != null && pickPressed)
             {
                 TryPickSeed();
             }

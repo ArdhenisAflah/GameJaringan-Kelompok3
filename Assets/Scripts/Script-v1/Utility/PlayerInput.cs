@@ -46,6 +46,13 @@ namespace Utility
         public KeyCode PlantKey => plantKey;
         public KeyCode ActionKey => actionKey;
         public KeyCode InteractKey => interactKey;
+        public KeyCode ToolEmptyKey => toolEmptyKey;
+        public KeyCode ToolHoeKey => toolHoeKey;
+        public KeyCode ToolWaterKey => toolWaterKey;
+        public KeyCode BypassDigKey => bypassDigKey;
+        public KeyCode BypassWaterKey => bypassWaterKey;
+        public KeyCode BypassGrassKey => bypassGrassKey;
+        public bool IsInputEnabled => inputEnabled;
 
         /// <summary>
         /// Mengaktifkan atau menonaktifkan pembacaan input pemain.
