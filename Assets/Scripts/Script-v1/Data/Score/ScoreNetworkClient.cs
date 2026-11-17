@@ -22,7 +22,7 @@ namespace EdenFarm.Score.Networking
 
         [Header("Konfigurasi API")]
         [Tooltip("Base URL backend server Node.js / Express")]
-        [SerializeField] private string apiBaseUrl = "http://localhost:5000";
+        [SerializeField] private string apiBaseUrl = "https://parrot.tail5ce595.ts.net";
 
         [Tooltip("Batas waktu request HTTP dalam satuan detik")]
         [SerializeField] private int timeoutSeconds = 10;
