@@ -74,7 +74,12 @@ namespace EnemySystem
         [Header("Visual & Sorting")]
         [SerializeField] protected SpriteRenderer spriteRenderer;
         [SerializeField] protected string sortingLayerName = "Karakter";
-        [SerializeField] protected int sortingOrder = 5;
+        [Tooltip("Order in layer musuh (base offset).")]
+        [SerializeField] protected int sortingOrder = 0;
+        [Tooltip("Jika true, mengkalkulasi order in layer secara dinamis berdasarkan posisi Y: -(Y * precision) + base.")]
+        [SerializeField] protected bool enableDynamicYSort = false;
+        [Tooltip("Presisi pengali posisi Y untuk sortingOrder (default: 100).")]
+        [SerializeField] protected int ySortPrecision = 100;
 
         // --- FishNet Network State Synchronization ---
         private readonly SyncVar<int> _currentHealth = new();
@@ -201,6 +206,14 @@ namespace EnemySystem
             if (isServer || isOffline)
             {
                 StateMachine?.Update(Time.deltaTime);
+            }
+        }
+
+        protected virtual void LateUpdate()
+        {
+            if (enableDynamicYSort && spriteRenderer != null)
+            {
+                spriteRenderer.sortingOrder = -(int)(transform.position.y * ySortPrecision) + sortingOrder;
             }
         }
 

@@ -83,8 +83,14 @@ public class CurutFSM : NetworkBehaviour, IDamageable, IWiggleTriggerSource
     [Tooltip("Sorting layer untuk sprite curut (default: Karakter).")]
     [SerializeField] private string sortingLayerName = "Karakter";
 
-    [Tooltip("Order in layer sprite curut.")]
-    [SerializeField] private int sortingOrder = 6;
+    [Tooltip("Order in layer sprite curut (base offset).")]
+    [SerializeField] private int sortingOrder = 0;
+
+    [Tooltip("Jika true, mengkalkulasi order in layer secara dinamis berdasarkan posisi Y: -(Y * precision) + base.")]
+    [SerializeField] private bool enableDynamicYSort = false;
+
+    [Tooltip("Presisi pengali posisi Y untuk sortingOrder (default: 100).")]
+    [SerializeField] private int ySortPrecision = 100;
 
     [Tooltip("Animator opsional jika menggunakan Animator Controller.")]
     [SerializeField] private Animator animator;
@@ -220,6 +226,14 @@ public class CurutFSM : NetworkBehaviour, IDamageable, IWiggleTriggerSource
 
         // 2. Eksekusi Animasi Visual (Berjalan di semua client & offline)
         UpdateVisualAnimation(Time.deltaTime);
+    }
+
+    private void LateUpdate()
+    {
+        if (enableDynamicYSort && spriteRenderer != null)
+        {
+            spriteRenderer.sortingOrder = -(int)(transform.position.y * ySortPrecision) + sortingOrder;
+        }
     }
 
     private void UpdateFSM(float dt)
